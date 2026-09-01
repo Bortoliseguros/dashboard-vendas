@@ -37,11 +37,17 @@ def gerar_excel_formatado(df_original):
     
     df_exp = df_original.copy()
     
-    # Tratamento da coluna STATUS (Preenche vazios com 'A implantar')
+    # Preenchimento de 'A IMPLANTAR' em caixa alta para a Coluna D (STATUS)
     col_st = next((c for c in df_exp.columns if c.upper() == 'STATUS'), None)
     if col_st:
-        df_exp[col_st] = df_exp[col_st].fillna('A implantar')
-        df_exp[col_st] = df_exp[col_st].apply(lambda x: 'A implantar' if str(x).strip() == '' or pd.isna(x) else str(x))
+        df_exp[col_st] = df_exp[col_st].fillna('A IMPLANTAR')
+        df_exp[col_st] = df_exp[col_st].apply(lambda x: 'A IMPLANTAR' if pd.isna(x) or str(x).strip() == '' else str(x))
+
+    # Preenchimento de 'A IMPLANTAR' em caixa alta para a Coluna W (STATUS NO 104)
+    col_w_name = df_exp.columns[22] if len(df_exp.columns) > 22 else None
+    if col_w_name:
+        df_exp[col_w_name] = df_exp[col_w_name].fillna('A IMPLANTAR')
+        df_exp[col_w_name] = df_exp[col_w_name].apply(lambda x: 'A IMPLANTAR' if pd.isna(x) or str(x).strip() == '' else str(x))
         
     # Mascarar CPF
     col_cpf_name = next((c for c in df_exp.columns if 'CPF' in c.upper()), None)
@@ -57,7 +63,7 @@ def gerar_excel_formatado(df_original):
     if col_x:
         df_exp[col_x] = pd.to_datetime(df_exp[col_x], errors='coerce').dt.strftime('%d/%m/%Y').fillna('')
 
-    # Remover colunas auxiliares internas se existirem
+    # Remover colunas auxiliares internas
     cols_drop = ['DATA_REF', 'ANO', 'MES_ANO', 'TRIMESTRE']
     df_exp.drop(columns=[c for c in cols_drop if c in df_exp.columns], inplace=True, errors='ignore')
     
@@ -76,9 +82,9 @@ def gerar_excel_formatado(df_original):
     for row in df_exp.itertuples(index=False):
         ws.append(list(row))
         
-    # Formatação exata de tipos por célula no Excel
+    # Formatação de tipos por célula no Excel
     for row_idx in range(2, ws.max_row + 1):
-        # Coluna A (Coluna 1) - Número Inteiro
+        # Coluna A (Coluna 1) - Número Inteiro (ID)
         cell_a = ws.cell(row=row_idx, column=1)
         if cell_a.value is not None and str(cell_a.value).strip() != '':
             try:
@@ -86,7 +92,7 @@ def gerar_excel_formatado(df_original):
                 cell_a.number_format = '0'
             except: pass
 
-        # Coluna C (Coluna 3) - Número Inteiro da Proposta
+        # Coluna C (Coluna 3) - Número Inteiro (Proposta)
         cell_c = ws.cell(row=row_idx, column=3)
         if cell_c.value is not None and str(cell_c.value).strip() != '':
             try:
@@ -97,7 +103,7 @@ def gerar_excel_formatado(df_original):
         # Valores Decimais / Moeda
         for col_idx in range(1, ws.max_column + 1):
             if col_idx in [1, 3]: 
-                continue # Pula colunas A e C
+                continue
             cell = ws.cell(row=row_idx, column=col_idx)
             if isinstance(cell.value, (int, float)) and not isinstance(cell.value, bool):
                 cell.number_format = '#,##0.00'
@@ -124,11 +130,16 @@ if file is not None:
     col_corretor = df.columns[7] # Coluna H (AGENTE MAG)
     col_data = df.columns[8]    # Coluna I (A PARTIR DE)
     col_status = next((c for c in df.columns if c.upper() == 'STATUS'), df.columns[3])
+    col_w_status = df.columns[22] if len(df.columns) > 22 else None # Coluna W (STATUS NO 104)
     cols_coberturas = df.columns[9:22] # Colunas J até V
     
-    # Regra: Tratamento do Status vazio para "A implantar"
-    df[col_status] = df[col_status].fillna('A implantar')
-    df[col_status] = df[col_status].apply(lambda x: 'A implantar' if str(x).strip() == '' or pd.isna(x) else str(x))
+    # Preenchimento automático de vazios com "A IMPLANTAR" em caixa alta
+    df[col_status] = df[col_status].fillna('A IMPLANTAR')
+    df[col_status] = df[col_status].apply(lambda x: 'A IMPLANTAR' if pd.isna(x) or str(x).strip() == '' else str(x))
+    
+    if col_w_status:
+        df[col_w_status] = df[col_w_status].fillna('A IMPLANTAR')
+        df[col_w_status] = df[col_w_status].apply(lambda x: 'A IMPLANTAR' if pd.isna(x) or str(x).strip() == '' else str(x))
     
     # Tratamento de datas
     df['DATA_REF'] = pd.to_datetime(df[col_data], errors='coerce')
@@ -136,7 +147,7 @@ if file is not None:
     df['MES_ANO'] = df['DATA_REF'].dt.strftime('%m/%Y')
     df['TRIMESTRE'] = df['DATA_REF'].apply(lambda d: f"{d.year}-Q{(d.month-1)//3 + 1}" if pd.notna(d) else 'N/A')
     
-    # Estrutura em 4 Guias (Tabs)
+    # Estrutura das Guias
     tab1, tab2, tab3, tab4 = st.tabs([
         "📈 Vendas no Mês, Trimestre e Ano",
         "🤝 Vendas por Corretores (Mensal, Trimestral e Anual)",
@@ -145,7 +156,7 @@ if file is not None:
     ])
     
     # -------------------------------------------------------------------------
-    # GUIA 1: VENDAS GERAIS (MÊS, TRIMESTRE E ANO)
+    # GUIA 1: VENDAS GERAIS
     # -------------------------------------------------------------------------
     with tab1:
         st.subheader("Vendas Gerais por Mês, Trimestre e Ano")
@@ -169,34 +180,47 @@ if file is not None:
         st.dataframe(df_vendas, use_container_width=True)
 
     # -------------------------------------------------------------------------
-    # GUIA 2: VENDAS POR CORRETORES (MENSAL, TRIMESTRAL E ANUAL)
+    # GUIA 2: VENDAS POR CORRETORES (ORDENADO DO MAIOR PARA O MENOR)
     # -------------------------------------------------------------------------
     with tab2:
         st.subheader("Vendas por Corretores")
         
-        c1, c2 = st.columns([1, 2])
+        per_corretor = st.radio("Escala Temporal:", ["Mensal", "Trimestral", "Anual"], key="vis_corr", horizontal=True)
+        col_c = 'MES_ANO' if per_corretor == "Mensal" else ('TRIMESTRE' if per_corretor == "Trimestral" else 'ANO')
+        
+        # Filtros específicos de período e corretor
+        c1, c2 = st.columns(2)
         with c1:
-            per_corretor = st.radio("Visão Temporal:", ["Mensal", "Trimestral", "Anual"], key="vis_corr", horizontal=True)
+            periodos_disponiveis = ["TODOS"] + sorted([p for p in df[col_c].dropna().unique() if p != 'N/A'])
+            periodo_sel = st.selectbox(f"Filtrar por {per_corretor[:-2]} Especifico:", options=periodos_disponiveis)
         with c2:
             lista_corretores = ["TODOS"] + sorted(df[col_corretor].dropna().unique().tolist())
             corretor_sel = st.selectbox("Filtrar por Corretor Especifico:", options=lista_corretores)
 
-        col_c = 'MES_ANO' if per_corretor == "Mensal" else ('TRIMESTRE' if per_corretor == "Trimestral" else 'ANO')
-        
         df_corr = df.copy()
+        if periodo_sel != "TODOS":
+            df_corr = df_corr[df_corr[col_c] == periodo_sel]
         if corretor_sel != "TODOS":
             df_corr = df_corr[df_corr[col_corretor] == corretor_sel]
             
         df_grp = df_corr.groupby([col_c, col_corretor]).size().reset_index(name='Vendas')
         df_grp = df_grp[df_grp[col_c] != 'N/A']
         
+        # Ordenação do maior para o menor pelo volume de vendas
+        df_grp = df_grp.sort_values(by=['Vendas', col_c], ascending=[False, True]).reset_index(drop=True)
+        
+        # Destaque para o líder de vendas no topo
+        if not df_grp.empty:
+            lider = df_grp.iloc[0]
+            st.success(f"🥇 **Líder de Vendas no Período Selecionado:** {lider[col_corretor]} ({lider['Vendas']} vendas)")
+        
         fig_corr = px.bar(
             df_grp, x=col_c, y='Vendas', color=col_corretor, barmode='group',
-            text='Vendas', title=f"Vendas por Corretor ({per_corretor})"
+            text='Vendas', title=f"Vendas por Corretor ({per_corretor}) - Ordenado pelo Maior Volume"
         )
         st.plotly_chart(fig_corr, use_container_width=True)
         
-        st.markdown("**Tabela Detalhada de Vendas por Corretor**")
+        st.markdown("**Tabela Detalhada de Vendas por Corretor (Do Maior para o Menor Volume)**")
         st.dataframe(df_grp, use_container_width=True)
 
     # -------------------------------------------------------------------------
@@ -227,7 +251,6 @@ if file is not None:
     with tab4:
         st.subheader("Relatorio dos riscos e peculios contratados")
         
-        # Filtro extra por Status da Proposta
         todos_status = sorted(df[col_status].unique().tolist())
         status_sel = st.multiselect(
             "Filtrar por Status da Proposta:",
