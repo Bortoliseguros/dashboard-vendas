@@ -36,15 +36,15 @@ st.sidebar.header("📁 Importar Dados")
 uploaded_file = st.sidebar.file_uploader("Selecione a planilha Excel (.xlsx)", type=["xlsx", "xls"])
 
 def mascarar_cpf(cpf):
-    """Mascara o CPF para exibir apenas os últimos 5 dígitos (ex: ***.***.117-99)"""
+    """Mascara o CPF exibindo asteriscos no Streamlit sem conflito de Markdown"""
     if pd.isna(cpf):
         return "N/A"
     digits = re.sub(r'\D', '', str(cpf))
     if len(digits) == 11:
-        return f"***.***.{digits[6:9]}-{digits[9:]}"
+        return f"\*\*\*.\*\*\*.{digits[6:9]}-{digits[9:]}"
     elif len(digits) > 5:
-        return f"***.***.{digits[-5:-2]}-{digits[-2:]}"
-    return "***.***.***-**"
+        return f"\*\*\*.\*\*\*.{digits[-5:-2]}-{digits[-2:]}"
+    return "\*\*\*.\*\*\*.\*\*\*-\*\*"
 
 def parse_data_partir(val):
     if pd.isna(val):
