@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import re
+import io
 from datetime import datetime
 
 # Configuração da Página
@@ -219,7 +220,7 @@ if uploaded_file is not None:
                 st.dataframe(ranking, use_container_width=True)
 
         # ----------------------------------------------------
-        # ABA 3: CONSULTA DE PARTICIPANTE E COBERTURAS
+        # ABA 3: CONSULTA DE PARTICIPANTE E EXPORTAÇÃO
         # ----------------------------------------------------
         with tab3:
             st.subheader("Consulta de Coberturas Contratadas")
@@ -259,6 +260,35 @@ if uploaded_file is not None:
                     
                 df_cob_view = pd.DataFrame(coberturas_data)
                 st.table(df_cob_view)
+
+            # --- SEÇÃO DE EXPORTAÇÃO COMPLETA EM EXCEL ---
+            st.divider()
+            st.subheader("📥 Exportar Relatório Consolidado")
+            st.markdown("Baixe um relatório completo contendo todos os participantes, propostas, corretores e o detalhamento individual de cada cobertura e pecúlio.")
+
+            # Selecionar colunas para exportar
+            colunas_exportacao = []
+            if col_nome: colunas_exportacao.append(col_nome)
+            colunas_exportacao.append('CPF_MASCARADO')
+            if col_proposta: colunas_exportacao.append(col_proposta)
+            if col_corretor: colunas_exportacao.append(col_corretor)
+            if col_a_partir: colunas_exportacao.append(col_a_partir)
+            
+            colunas_exportacao.extend([c for c in cols_coberturas if c in df.columns])
+            
+            df_export = df[colunas_exportacao].copy()
+
+            # Criar arquivo Excel na memória
+            output_excel = io.BytesIO()
+            with pd.ExcelWriter(output_excel, engine='openpyxl') as writer:
+                df_export.to_excel(writer, index=False, sheet_name='Coberturas_Completas')
+
+            st.download_button(
+                label="📊 Baixar Relatório Geral em Excel (.xlsx)",
+                data=output_excel.getvalue(),
+                file_name=f"relatorio_geral_coberturas_{datetime.now().strftime('%d_%m_%Y')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
 
     except Exception as e:
         st.error(f"Ocorreu um erro ao ler a planilha: {e}")
