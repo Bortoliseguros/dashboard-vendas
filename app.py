@@ -11,7 +11,7 @@ from openpyxl.utils import get_column_letter
 
 st.set_page_config(page_title="Dashboard e Gestão de Riscos", layout="wide")
 
-st.title("📊 Painel de Vendas e Gestão de Riscos")
+
 # Mascaramento de CPF
 def mascarar_cpf(val):
     if pd.isna(val):
