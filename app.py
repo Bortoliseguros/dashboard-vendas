@@ -29,23 +29,31 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown('<div class="main-header">📊 Dashboard Comercial e Relatório de Coberturas</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-header">Faça o upload do seu arquivo Excel para processar os dados e visualizar os relatórios na nuvem.</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-header">Faça o upload do seu arquivo Excel para processar os dados com conformidade de privacidade (LGPD).</div>', unsafe_allow_html=True)
 
-# Sidebar - Upload e Filtros
+# Sidebar - Upload
 st.sidebar.header("📁 Importar Dados")
 uploaded_file = st.sidebar.file_uploader("Selecione a planilha Excel (.xlsx)", type=["xlsx", "xls"])
+
+def mascarar_cpf(cpf):
+    """Mascara o CPF para exibir apenas os últimos 5 dígitos (ex: ***.***.117-99)"""
+    if pd.isna(cpf):
+        return "N/A"
+    digits = re.sub(r'\D', '', str(cpf))
+    if len(digits) == 11:
+        return f"***.***.{digits[6:9]}-{digits[9:]}"
+    elif len(digits) > 5:
+        return f"***.***.{digits[-5:-2]}-{digits[-2:]}"
+    return "***.***.***-**"
 
 def parse_data_partir(val):
     if pd.isna(val):
         return None
     
-    # Se o Excel já leu diretamente como um objeto de data/Timestamp
     if isinstance(val, (pd.Timestamp, datetime)):
         return val
 
     val_str = str(val).strip().lower()
-    
-    # Tratamento para textos do tipo 'set/26' ou 'set-2026'
     meses_pt = {
         'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
         'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12
@@ -59,7 +67,6 @@ def parse_data_partir(val):
             ano = int('20' + ano_str if len(ano_str) == 2 else ano_str)
             return datetime(ano, mes, 1)
             
-    # Tratamento para formato brasileiro DD/MM/AAAA (ex: 01/09/2026 -> 01 de Setembro)
     try:
         dt = pd.to_datetime(val_str, dayfirst=True, errors='coerce')
         if pd.notna(dt):
@@ -75,7 +82,7 @@ if uploaded_file is not None:
         # Normalizar nomes de colunas
         df.columns = [str(c).strip().upper() for c in df.columns]
         
-        # Mapeamento de colunas esperadas
+        # Mapeamento de colunas
         col_id = next((c for c in df.columns if 'ID' in c), None)
         col_nome = next((c for c in df.columns if 'NOME' in c), None)
         col_cpf = next((c for c in df.columns if 'CPF' in c), None)
@@ -83,6 +90,12 @@ if uploaded_file is not None:
         col_corretor = next((c for c in df.columns if 'CORRETOR' in c), None)
         col_a_partir = next((c for c in df.columns if 'PARTIR' in c or 'DATA' in c), None)
         
+        # Aplicação de Mascaramento do CPF (LGPD)
+        if col_cpf:
+            df['CPF_MASCARADO'] = df[col_cpf].apply(mascarar_cpf)
+        else:
+            df['CPF_MASCARADO'] = "N/A"
+
         # Processar Data
         if col_a_partir:
             df['DATA_REF'] = df[col_a_partir].apply(parse_data_partir)
@@ -90,9 +103,7 @@ if uploaded_file is not None:
             df['MES_ANO'] = df['DATA_REF'].apply(lambda d: d.strftime('%m/%Y') if pd.notna(d) and d else 'N/A')
             df['TRIMESTRE'] = df['DATA_REF'].apply(lambda d: f"{d.year}-Q{(d.month-1)//3 + 1}" if pd.notna(d) and d else 'N/A')
         else:
-            df['ANO'] = 'N/A'
-            df['MES_ANO'] = 'N/A'
-            df['TRIMESTRE'] = 'N/A'
+            df['ANO'], df['MES_ANO'], df['TRIMESTRE'] = 'N/A', 'N/A', 'N/A'
             
         # Converter colunas numéricas de coberturas
         cols_coberturas = [
@@ -228,7 +239,7 @@ if uploaded_file is not None:
                 c_p1, c_p2, c_p3 = st.columns(3)
                 with c_p1:
                     st.markdown(f"**Nome:** {row[col_nome] if col_nome else 'N/A'}")
-                    st.markdown(f"**CPF:** {row[col_cpf] if col_cpf else 'N/A'}")
+                    st.markdown(f"**CPF (Protegido):** {row['CPF_MASCARADO']}")
                 with c_p2:
                     st.markdown(f"**Proposta:** {row[col_proposta] if col_proposta else 'N/A'}")
                     st.markdown(f"**Corretor:** {row[col_corretor] if col_corretor else 'N/A'}")
