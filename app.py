@@ -117,8 +117,7 @@ def gerar_excel_formatado(df_original):
     wb.save(output)
     return output.getvalue()
 
-st.title("📊 Painel de riscos e pecúlios do Plano FLORIPAPREV")
-
+st.markdown("<h1 style='color: #87CEEB;'>📊 Painel de riscos e pecúlios do Plano FLORIPAPREV</h1>", unsafe_allow_html=True)
 # CARREGAMENTO AUTOMÁTICO DO ARQUIVO EXATO NO GITHUB
 ARQUIVO_PADRAO = "RELACAO DE MALOTE RECEBIDO SEGURADORA.xlsx"
 
