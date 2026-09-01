@@ -117,7 +117,7 @@ def gerar_excel_formatado(df_original):
     wb.save(output)
     return output.getvalue()
 
-st.title("📊 Painel de Vendas e Gestão de Riscos")
+st.title("📊 Painel de riscos e pecúlios do Plano FLORIPAPREV")
 
 # CARREGAMENTO AUTOMÁTICO DO ARQUIVO EXATO NO GITHUB
 ARQUIVO_PADRAO = "RELACAO DE MALOTE RECEBIDO SEGURADORA.xlsx"
