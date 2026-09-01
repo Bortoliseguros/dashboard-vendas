@@ -33,7 +33,7 @@ def obter_status_104(val):
     if pd.isna(val) or str(val).strip() == '' or str(val).strip().upper() == 'NAN':
         return 'A IMPLANTAR'
     v = str(val).strip().upper()
-    if 'IMPLANTAD' in v: # Cobre IMPLANTADA ou IMPLANTADO
+    if 'IMPLANTAD' in v:
         return 'IMPLANTADA'
     return 'A IMPLANTAR'
 
@@ -46,23 +46,19 @@ def gerar_excel_formatado(df_original):
     
     df_exp = df_original.copy()
     
-    # Preenchimento de vazios na Coluna D (STATUS - Índice 3)
     col_d_name = df_exp.columns[3] if len(df_exp.columns) > 3 else None
     if col_d_name:
         df_exp[col_d_name] = df_exp[col_d_name].fillna('A IMPLANTAR')
         df_exp[col_d_name] = df_exp[col_d_name].apply(lambda x: 'A IMPLANTAR' if pd.isna(x) or str(x).strip() == '' else str(x))
 
-    # Aplicação da regra na Coluna W (STATUS NO 104 - Índice 22)
     col_w_name = df_exp.columns[22] if len(df_exp.columns) > 22 else None
     if col_w_name:
         df_exp[col_w_name] = df_exp[col_w_name].apply(obter_status_104)
         
-    # Mascarar CPF
     col_cpf_name = next((c for c in df_exp.columns if 'CPF' in c.upper()), None)
     if col_cpf_name:
         df_exp[col_cpf_name] = df_exp[col_cpf_name].apply(mascarar_cpf)
         
-    # Datas formatadas (sem hora)
     col_i = df_exp.columns[8] if len(df_exp.columns) > 8 else None
     col_x = df_exp.columns[23] if len(df_exp.columns) > 23 else None
     
@@ -71,8 +67,7 @@ def gerar_excel_formatado(df_original):
     if col_x:
         df_exp[col_x] = pd.to_datetime(df_exp[col_x], errors='coerce').dt.strftime('%d/%m/%Y').fillna('')
 
-    # Remover colunas auxiliares do sistema
-    cols_drop = ['DATA_REF', 'ANO', 'MES_ANO', 'TRIMESTRE', 'STATUS_DASHBOARD']
+    cols_drop = ['DATA_REF', 'ANO', 'MES_ANO', 'TRIMESTRE', 'SEMESTRE', 'STATUS_DASHBOARD']
     df_exp.drop(columns=[c for c in cols_drop if c in df_exp.columns], inplace=True, errors='ignore')
     
     headers = list(df_exp.columns)
@@ -90,7 +85,6 @@ def gerar_excel_formatado(df_original):
     for row in df_exp.itertuples(index=False):
         ws.append(list(row))
         
-    # Formatação de Números e Moedas
     for row_idx in range(2, ws.max_row + 1):
         cell_a = ws.cell(row=row_idx, column=1)
         if cell_a.value is not None and str(cell_a.value).strip() != '':
@@ -134,20 +128,20 @@ if file is not None:
     col_cpf = next((c for c in df.columns if 'CPF' in c.upper()), df.columns[6])
     col_corretor = df.columns[7] # Coluna H (AGENTE MAG)
     col_data = df.columns[8]    # Coluna I (A PARTIR DE)
-    col_w_status = df.columns[22] if len(df.columns) > 22 else None # Coluna W (STATUS NO 104)
+    col_w_status = df.columns[22] if len(df.columns) > 22 else None # Coluna W
     cols_coberturas = df.columns[9:22] # Colunas J até V
     
-    # Criar uma coluna oficial de status para o Dashboard baseada EXCLUSIVAMENTE na Coluna W
     if col_w_status:
         df['STATUS_DASHBOARD'] = df[col_w_status].apply(obter_status_104)
     else:
         df['STATUS_DASHBOARD'] = 'A IMPLANTAR'
     
-    # Tratamento de datas
+    # Tratamento de datas e períodos
     df['DATA_REF'] = pd.to_datetime(df[col_data], errors='coerce')
     df['ANO'] = df['DATA_REF'].dt.year.astype(str)
     df['MES_ANO'] = df['DATA_REF'].dt.strftime('%m/%Y')
     df['TRIMESTRE'] = df['DATA_REF'].apply(lambda d: f"{d.year}-Q{(d.month-1)//3 + 1}" if pd.notna(d) else 'N/A')
+    df['SEMESTRE'] = df['DATA_REF'].apply(lambda d: f"{d.year} - {1 if d.month <= 6 else 2}º Semestre" if pd.notna(d) else 'N/A')
     
     # Estrutura das Guias
     tab1, tab2, tab3, tab4 = st.tabs([
@@ -203,7 +197,6 @@ if file is not None:
         df_grp = df_corr.groupby([col_c, col_corretor]).size().reset_index(name='Vendas')
         df_grp = df_grp[df_grp[col_c] != 'N/A']
         
-        # ORDENAÇÃO CORRETA: Primeiro por período decrescente (mais recente primeiro) e depois por Vendas do maior para o menor
         df_grp['TEMP_DATE'] = pd.to_datetime(df_grp[col_c], format='%m/%Y', errors='coerce')
         df_grp = df_grp.sort_values(by=['TEMP_DATE', 'Vendas'], ascending=[False, False]).drop(columns=['TEMP_DATE']).reset_index(drop=True)
         
@@ -213,30 +206,44 @@ if file is not None:
         )
         st.plotly_chart(fig_corr, use_container_width=True)
         
-        st.markdown("**Tabela Detalhada de Vendas por Corretor (Ordenado do Maior para o Menor por Mês)**")
+        st.markdown("**Tabela Detalhada de Vendas por Corretor (Ordenado do Maior para o Menor por Período)**")
         st.dataframe(df_grp, use_container_width=True)
 
     # -------------------------------------------------------------------------
-    # GUIA 3: RANKING DE PRODUTORES
+    # GUIA 3: RANKING DE PRODUTORES (Com Seletor de Período)
     # -------------------------------------------------------------------------
     with tab3:
-        st.subheader("Ranking de Produtores (Coluna H)")
+        st.subheader("🏆 Ranking de Produtores (Coluna H)")
         
-        def get_top_corretores(grupo):
-            top = df.groupby([grupo, col_corretor]).size().reset_index(name='Qtd Vendas')
-            top = top.sort_values(by=[grupo, 'Qtd Vendas'], ascending=[True, False])
-            return top.groupby(grupo).first().reset_index()
-
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.markdown("**Top Produtor por Mês**")
-            st.dataframe(get_top_corretores('MES_ANO'), use_container_width=True)
-        with col2:
-            st.markdown("**Top Produtor por Trimestre**")
-            st.dataframe(get_top_corretores('TRIMESTRE'), use_container_width=True)
-        with col3:
-            st.markdown("**Top Produtor por Ano**")
-            st.dataframe(get_top_corretores('ANO'), use_container_width=True)
+        vis_ranking = st.radio(
+            "Selecione a base temporal para o Ranking:",
+            ["Mensal", "Trimestral", "Semestral", "Anual"],
+            key="vis_ranking_sel",
+            horizontal=True
+        )
+        
+        if vis_ranking == "Mensal":
+            col_rank = 'MES_ANO'
+            titulo_rank = "Ranking de Vendas por Mês (Do Maior para o Menor)"
+        elif vis_ranking == "Trimestral":
+            col_rank = 'TRIMESTRE'
+            titulo_rank = "Ranking de Vendas por Trimestre (Do Maior para o Menor)"
+        elif vis_ranking == "Semestral":
+            col_rank = 'SEMESTRE'
+            titulo_rank = "Ranking de Vendas por Semestre (Do Maior para o Menor)"
+        else:
+            col_rank = 'ANO'
+            titulo_rank = "Ranking de Vendas por Ano (Do Maior para o Menor)"
+            
+        st.markdown(f"#### {titulo_rank}")
+        
+        df_ranking_res = df.groupby([col_rank, col_corretor]).size().reset_index(name='Qtd Vendas')
+        df_ranking_res = df_ranking_res[df_ranking_res[col_rank] != 'N/A']
+        
+        df_ranking_res['TEMP_DATE'] = pd.to_datetime(df_ranking_res[col_rank], format='%m/%Y', errors='coerce')
+        df_ranking_res = df_ranking_res.sort_values(by=['TEMP_DATE', 'Qtd Vendas'], ascending=[False, False]).drop(columns=['TEMP_DATE']).reset_index(drop=True)
+        
+        st.dataframe(df_ranking_res, use_container_width=True)
 
     # -------------------------------------------------------------------------
     # GUIA 4: RELATÓRIO DOS RISCOS E PECÚLIOS CONTRATADOS
@@ -256,7 +263,6 @@ if file is not None:
             df_part = df[df[col_nome] == participante_sel].iloc[0]
             status_final = df_part['STATUS_DASHBOARD']
             
-            # Aplica cor visual baseada na regra da Coluna W (104)
             if status_final == 'IMPLANTADA':
                 status_html = "<span style='background-color: #D1FAE5; color: #059669; padding: 4px 10px; border-radius: 6px; font-weight: bold;'>IMPLANTADA</span>"
             else:
