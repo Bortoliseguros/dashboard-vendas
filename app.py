@@ -4,6 +4,7 @@ import numpy as np
 import plotly.express as px
 import re
 import io
+import os
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter
@@ -117,11 +118,24 @@ def gerar_excel_formatado(df_original):
 
 st.title("📊 Painel de Vendas e Gestão de Riscos")
 
-st.sidebar.header("Carregar Base de Dados")
-file = st.sidebar.file_uploader("Envie a planilha (.xlsx)", type=["xlsx"])
+# CARREGAMENTO AUTOMÁTICO DO ARQUIVO EXATO NO GITHUB
+ARQUIVO_PADRAO = "RELACAO DE MALOTE RECEBIDO SEGURADORA.xlsx"
 
-if file is not None:
-    df = pd.read_excel(file)
+df = None
+if os.path.exists(ARQUIVO_PADRAO):
+    try:
+        df = pd.read_excel(ARQUIVO_PADRAO)
+        st.sidebar.success("✅ Dados carregados automaticamente!")
+    except Exception as e:
+        st.sidebar.error(f"Erro ao ler o arquivo: {e}")
+else:
+    # Fallback caso o arquivo ainda não tenha sido enviado para o repositório
+    st.sidebar.warning(f"Arquivo '{ARQUIVO_PADRAO}' não encontrado no GitHub. Envie abaixo:")
+    file_up = st.sidebar.file_uploader("Enviar planilha (.xlsx)", type=["xlsx"])
+    if file_up is not None:
+        df = pd.read_excel(file_up)
+
+if df is not None:
     df.columns = [str(c).strip() for c in df.columns]
     
     col_nome = next((c for c in df.columns if 'NOME' in c.upper() or 'PROPONENTE' in c.upper()), df.columns[5])
@@ -309,4 +323,4 @@ if file is not None:
         else:
             st.warning("Nenhum participante encontrado na base de dados.")
 else:
-    st.info("Aguardando upload da planilha na barra lateral.")
+    st.error("O arquivo 'RELACAO DE MALOTE RECEBIDO SEGURADORA.xlsx' não foi encontrado no repositório do GitHub. Certifique-se de enviá-lo para a mesma pasta do app.py.")
