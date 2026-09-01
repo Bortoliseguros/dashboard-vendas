@@ -28,6 +28,15 @@ def classificar_desempenho(val, media, tol=0.05):
     else:
         return 'Na Média'
 
+# Regra oficial para a Coluna W (Status no 104)
+def obter_status_104(val):
+    if pd.isna(val) or str(val).strip() == '' or str(val).strip().upper() == 'NAN':
+        return 'A IMPLANTAR'
+    v = str(val).strip().upper()
+    if 'IMPLANTAD' in v: # Cobre IMPLANTADA ou IMPLANTADO
+        return 'IMPLANTADA'
+    return 'A IMPLANTAR'
+
 # Gerador de Relatório Excel Ajustado
 def gerar_excel_formatado(df_original):
     output = io.BytesIO()
@@ -37,24 +46,23 @@ def gerar_excel_formatado(df_original):
     
     df_exp = df_original.copy()
     
-    # Preenchimento de 'A IMPLANTAR' em caixa alta para a Coluna D (STATUS)
-    col_st = next((c for c in df_exp.columns if c.upper() == 'STATUS'), None)
-    if col_st:
-        df_exp[col_st] = df_exp[col_st].fillna('A IMPLANTAR')
-        df_exp[col_st] = df_exp[col_st].apply(lambda x: 'A IMPLANTAR' if pd.isna(x) or str(x).strip() == '' else str(x))
+    # Preenchimento de vazios na Coluna D (STATUS - Índice 3)
+    col_d_name = df_exp.columns[3] if len(df_exp.columns) > 3 else None
+    if col_d_name:
+        df_exp[col_d_name] = df_exp[col_d_name].fillna('A IMPLANTAR')
+        df_exp[col_d_name] = df_exp[col_d_name].apply(lambda x: 'A IMPLANTAR' if pd.isna(x) or str(x).strip() == '' else str(x))
 
-    # Preenchimento de 'A IMPLANTAR' em caixa alta para a Coluna W (STATUS NO 104)
+    # Aplicação da regra na Coluna W (STATUS NO 104 - Índice 22)
     col_w_name = df_exp.columns[22] if len(df_exp.columns) > 22 else None
     if col_w_name:
-        df_exp[col_w_name] = df_exp[col_w_name].fillna('A IMPLANTAR')
-        df_exp[col_w_name] = df_exp[col_w_name].apply(lambda x: 'A IMPLANTAR' if pd.isna(x) or str(x).strip() == '' else str(x))
+        df_exp[col_w_name] = df_exp[col_w_name].apply(obter_status_104)
         
     # Mascarar CPF
     col_cpf_name = next((c for c in df_exp.columns if 'CPF' in c.upper()), None)
     if col_cpf_name:
         df_exp[col_cpf_name] = df_exp[col_cpf_name].apply(mascarar_cpf)
         
-    # Coluna I (índice 8) e Coluna X (índice 23) formatadas apenas como DATA (sem hora)
+    # Datas formatadas (sem hora)
     col_i = df_exp.columns[8] if len(df_exp.columns) > 8 else None
     col_x = df_exp.columns[23] if len(df_exp.columns) > 23 else None
     
@@ -63,8 +71,8 @@ def gerar_excel_formatado(df_original):
     if col_x:
         df_exp[col_x] = pd.to_datetime(df_exp[col_x], errors='coerce').dt.strftime('%d/%m/%Y').fillna('')
 
-    # Remover colunas auxiliares internas
-    cols_drop = ['DATA_REF', 'ANO', 'MES_ANO', 'TRIMESTRE']
+    # Remover colunas auxiliares do sistema
+    cols_drop = ['DATA_REF', 'ANO', 'MES_ANO', 'TRIMESTRE', 'STATUS_DASHBOARD']
     df_exp.drop(columns=[c for c in cols_drop if c in df_exp.columns], inplace=True, errors='ignore')
     
     headers = list(df_exp.columns)
@@ -82,9 +90,8 @@ def gerar_excel_formatado(df_original):
     for row in df_exp.itertuples(index=False):
         ws.append(list(row))
         
-    # Formatação de tipos por célula no Excel
+    # Formatação de Números e Moedas
     for row_idx in range(2, ws.max_row + 1):
-        # Coluna A (Coluna 1) - Número Inteiro (ID)
         cell_a = ws.cell(row=row_idx, column=1)
         if cell_a.value is not None and str(cell_a.value).strip() != '':
             try:
@@ -92,7 +99,6 @@ def gerar_excel_formatado(df_original):
                 cell_a.number_format = '0'
             except: pass
 
-        # Coluna C (Coluna 3) - Número Inteiro (Proposta)
         cell_c = ws.cell(row=row_idx, column=3)
         if cell_c.value is not None and str(cell_c.value).strip() != '':
             try:
@@ -100,7 +106,6 @@ def gerar_excel_formatado(df_original):
                 cell_c.number_format = '0'
             except: pass
 
-        # Valores Decimais / Moeda
         for col_idx in range(1, ws.max_column + 1):
             if col_idx in [1, 3]: 
                 continue
@@ -129,17 +134,14 @@ if file is not None:
     col_cpf = next((c for c in df.columns if 'CPF' in c.upper()), df.columns[6])
     col_corretor = df.columns[7] # Coluna H (AGENTE MAG)
     col_data = df.columns[8]    # Coluna I (A PARTIR DE)
-    col_status = next((c for c in df.columns if c.upper() == 'STATUS'), df.columns[3])
     col_w_status = df.columns[22] if len(df.columns) > 22 else None # Coluna W (STATUS NO 104)
     cols_coberturas = df.columns[9:22] # Colunas J até V
     
-    # Preenchimento automático de vazios com "A IMPLANTAR" em caixa alta
-    df[col_status] = df[col_status].fillna('A IMPLANTAR')
-    df[col_status] = df[col_status].apply(lambda x: 'A IMPLANTAR' if pd.isna(x) or str(x).strip() == '' else str(x))
-    
+    # Criar uma coluna oficial de status para o Dashboard baseada EXCLUSIVAMENTE na Coluna W
     if col_w_status:
-        df[col_w_status] = df[col_w_status].fillna('A IMPLANTAR')
-        df[col_w_status] = df[col_w_status].apply(lambda x: 'A IMPLANTAR' if pd.isna(x) or str(x).strip() == '' else str(x))
+        df['STATUS_DASHBOARD'] = df[col_w_status].apply(obter_status_104)
+    else:
+        df['STATUS_DASHBOARD'] = 'A IMPLANTAR'
     
     # Tratamento de datas
     df['DATA_REF'] = pd.to_datetime(df[col_data], errors='coerce')
@@ -201,7 +203,6 @@ if file is not None:
         df_grp = df_corr.groupby([col_c, col_corretor]).size().reset_index(name='Vendas')
         df_grp = df_grp[df_grp[col_c] != 'N/A']
         
-        # Ordenação do maior para o menor pelo volume de vendas
         df_grp = df_grp.sort_values(by=['Vendas', col_c], ascending=[False, True]).reset_index(drop=True)
         
         fig_corr = px.bar(
@@ -251,6 +252,13 @@ if file is not None:
             )
             
             df_part = df[df[col_nome] == participante_sel].iloc[0]
+            status_final = df_part['STATUS_DASHBOARD']
+            
+            # Aplica cor visual baseada na regra da Coluna W (104)
+            if status_final == 'IMPLANTADA':
+                status_html = "<span style='background-color: #D1FAE5; color: #059669; padding: 4px 10px; border-radius: 6px; font-weight: bold;'>IMPLANTADA</span>"
+            else:
+                status_html = "<span style='background-color: #FEE2E2; color: #DC2626; padding: 4px 10px; border-radius: 6px; font-weight: bold;'>A IMPLANTAR</span>"
             
             st.markdown("---")
             i1, i2, i3 = st.columns(3)
@@ -261,7 +269,7 @@ if file is not None:
                 st.markdown(f"**Proposta:** {df_part.get('PROPOSTA', 'N/A')}")
                 st.markdown(f"**Agente/Corretor:** {df_part[col_corretor]}")
             with i3:
-                st.markdown(f"**Status:** `{df_part[col_status]}`")
+                st.markdown(f"**Status:** {status_html}", unsafe_allow_html=True)
                 st.markdown(f"**Data da Proposta:** {df_part['MES_ANO']}")
                 
             st.markdown("#### Detalhamento de Pecúlios e Riscos (Colunas J a V)")
