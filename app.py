@@ -1,326 +1,246 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import plotly.express as px
 import re
-import io
-import os
-import openpyxl
-from openpyxl.styles import Font, PatternFill, Alignment
-from openpyxl.utils import get_column_letter
+from datetime import datetime
 
-st.set_page_config(page_title="Dashboard e Gestão de Riscos", layout="wide")
+# Configuração da Página
+st.set_page_config(
+    page_title="Dashboard Comercial & Coberturas",
+    page_icon="📊",
+    layout="wide"
+)
 
-# Mascaramento de CPF
-def mascarar_cpf(val):
+# Estilização CSS personalizada
+st.markdown("""
+<style>
+    .main-header {
+        font-size: 2.2rem;
+        color: #1E3A8A;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+    .sub-header {
+        color: #4B5563;
+        font-size: 1.1rem;
+        margin-bottom: 2rem;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown('<div class="main-header">📊 Dashboard Comercial e Relatório de Coberturas</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-header">Faça o upload do seu arquivo Excel para processar os dados e visualizar os relatórios na nuvem.</div>', unsafe_allow_html=True)
+
+# Sidebar - Upload e Filtros
+st.sidebar.header("📁 Importar Dados")
+uploaded_file = st.sidebar.file_uploader("Selecione a planilha Excel (.xlsx)", type=["xlsx", "xls"])
+
+def parse_data_partir(val):
     if pd.isna(val):
-        return "N/A"
-    digits = re.sub(r'\D', '', str(val)).zfill(11)
-    if len(digits) >= 11:
-        return f"***.***.{digits[-5:-2]}-{digits[-2:]}"
-    return "***.***.***-**"
-
-# Classificação de Desempenho
-def classificar_desempenho(val, media, tol=0.05):
-    if val > media * (1 + tol):
-        return 'Acima da Média'
-    elif val < media * (1 - tol):
-        return 'Abaixo da Média'
-    else:
-        return 'Na Média'
-
-# Regra oficial para a Coluna W (Status no 104)
-def obter_status_104(val):
-    if pd.isna(val) or str(val).strip() == '' or str(val).strip().upper() == 'NAN':
-        return 'A IMPLANTAR'
-    v = str(val).strip().upper()
-    if 'IMPLANTAD' in v:
-        return 'IMPLANTADA'
-    return 'A IMPLANTAR'
-
-# Gerador de Relatório Excel Ajustado
-def gerar_excel_formatado(df_original):
-    output = io.BytesIO()
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "DETALHAMENTO POR PARTICIPANTE"
+        return None
+    val_str = str(val).strip().lower()
     
-    df_exp = df_original.copy()
+    meses_pt = {
+        'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
+        'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12
+    }
     
-    col_d_name = df_exp.columns[3] if len(df_exp.columns) > 3 else None
-    if col_d_name:
-        df_exp[col_d_name] = df_exp[col_d_name].fillna('A IMPLANTAR')
-        df_exp[col_d_name] = df_exp[col_d_name].apply(lambda x: 'A IMPLANTAR' if pd.isna(x) or str(x).strip() == '' else str(x))
-
-    col_w_name = df_exp.columns[22] if len(df_exp.columns) > 22 else None
-    if col_w_name:
-        df_exp[col_w_name] = df_exp[col_w_name].apply(obter_status_104)
-        
-    col_cpf_name = next((c for c in df_exp.columns if 'CPF' in c.upper()), None)
-    if col_cpf_name:
-        df_exp[col_cpf_name] = df_exp[col_cpf_name].apply(mascarar_cpf)
-        
-    col_i = df_exp.columns[8] if len(df_exp.columns) > 8 else None
-    col_x = df_exp.columns[23] if len(df_exp.columns) > 23 else None
-    
-    if col_i:
-        df_exp[col_i] = pd.to_datetime(df_exp[col_i], errors='coerce').dt.strftime('%d/%m/%Y').fillna('')
-    if col_x:
-        df_exp[col_x] = pd.to_datetime(df_exp[col_x], errors='coerce').dt.strftime('%d/%m/%Y').fillna('')
-
-    cols_drop = ['DATA_REF', 'ANO', 'MES_ANO', 'TRIMESTRE', 'SEMESTRE', 'STATUS_DASHBOARD']
-    df_exp.drop(columns=[c for c in cols_drop if c in df_exp.columns], inplace=True, errors='ignore')
-    
-    headers = list(df_exp.columns)
-    ws.append(headers)
-    
-    header_fill = PatternFill(start_color="1E3A8A", end_color="1E3A8A", fill_type="solid")
-    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
-    
-    for col_num, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col_num)
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = Alignment(horizontal="center", vertical="center")
-        
-    for row in df_exp.itertuples(index=False):
-        ws.append(list(row))
-        
-    for row_idx in range(2, ws.max_row + 1):
-        cell_a = ws.cell(row=row_idx, column=1)
-        if cell_a.value is not None and str(cell_a.value).strip() != '':
-            try:
-                cell_a.value = int(float(cell_a.value))
-                cell_a.number_format = '0'
-            except: pass
-
-        cell_c = ws.cell(row=row_idx, column=3)
-        if cell_c.value is not None and str(cell_c.value).strip() != '':
-            try:
-                cell_c.value = int(float(cell_c.value))
-                cell_c.number_format = '0'
-            except: pass
-
-        for col_idx in range(1, ws.max_column + 1):
-            if col_idx in [1, 3]: 
-                continue
-            cell = ws.cell(row=row_idx, column=col_idx)
-            if isinstance(cell.value, (int, float)) and not isinstance(cell.value, bool):
-                cell.number_format = '#,##0.00'
-                
-    for col in ws.columns:
-        max_len = max(len(str(cell.value or '')) for cell in col)
-        col_letter = get_column_letter(col[0].column)
-        ws.column_dimensions[col_letter].width = min(max(max_len + 3, 12), 40)
-        
-    wb.save(output)
-    return output.getvalue()
-
-st.title("📊 Painel de Vendas e Gestão de Riscos")
-
-# CARREGAMENTO AUTOMÁTICO DO ARQUIVO EXATO NO GITHUB
-ARQUIVO_PADRAO = "RELACAO DE MALOTE RECEBIDO SEGURADORA.xlsx"
-
-df = None
-if os.path.exists(ARQUIVO_PADRAO):
+    match = re.match(r'([a-z]{3})[/-](\d{2,4})', val_str)
+    if match:
+        mes_str, ano_str = match.groups()
+        if mes_str in meses_pt:
+            mes = meses_pt[mes_str]
+            ano = int('20' + ano_str if len(ano_str) == 2 else ano_str)
+            return datetime(ano, mes, 1)
+            
     try:
-        df = pd.read_excel(ARQUIVO_PADRAO)
-        st.sidebar.success("✅ Dados carregados automaticamente!")
-    except Exception as e:
-        st.sidebar.error(f"Erro ao ler o arquivo: {e}")
-else:
-    # Fallback caso o arquivo ainda não tenha sido enviado para o repositório
-    st.sidebar.warning(f"Arquivo '{ARQUIVO_PADRAO}' não encontrado no GitHub. Envie abaixo:")
-    file_up = st.sidebar.file_uploader("Enviar planilha (.xlsx)", type=["xlsx"])
-    if file_up is not None:
-        df = pd.read_excel(file_up)
+        dt = pd.to_datetime(val_str, dayfirst=True)
+        return dt.to_pydatetime()
+    except:
+        return None
 
-if df is not None:
-    df.columns = [str(c).strip() for c in df.columns]
-    
-    col_nome = next((c for c in df.columns if 'NOME' in c.upper() or 'PROPONENTE' in c.upper()), df.columns[5])
-    col_cpf = next((c for c in df.columns if 'CPF' in c.upper()), df.columns[6])
-    col_corretor = df.columns[7] # Coluna H (AGENTE MAG)
-    col_data = df.columns[8]    # Coluna I (A PARTIR DE)
-    col_w_status = df.columns[22] if len(df.columns) > 22 else None # Coluna W
-    cols_coberturas = df.columns[9:22] # Colunas J até V
-    
-    if col_w_status:
-        df['STATUS_DASHBOARD'] = df[col_w_status].apply(obter_status_104)
-    else:
-        df['STATUS_DASHBOARD'] = 'A IMPLANTAR'
-    
-    # Tratamento de datas e períodos
-    df['DATA_REF'] = pd.to_datetime(df[col_data], errors='coerce')
-    df['ANO'] = df['DATA_REF'].dt.year.astype(str)
-    df['MES_ANO'] = df['DATA_REF'].dt.strftime('%m/%Y')
-    df['TRIMESTRE'] = df['DATA_REF'].apply(lambda d: f"{d.year}-Q{(d.month-1)//3 + 1}" if pd.notna(d) else 'N/A')
-    df['SEMESTRE'] = df['DATA_REF'].apply(lambda d: f"{d.year} - {1 if d.month <= 6 else 2}º Semestre" if pd.notna(d) else 'N/A')
-    
-    # Estrutura das Guias
-    tab1, tab2, tab3, tab4 = st.tabs([
-        "📈 Vendas no Mês, Trimestre e Ano",
-        "🤝 Vendas por Corretores (Mensal, Trimestral e Anual)",
-        "🏆 Ranking de Produtores (Coluna H)",
-        "📋 Relatorio dos riscos e peculios contratados"
-    ])
-    
-    # -------------------------------------------------------------------------
-    # GUIA 1: VENDAS GERAIS
-    # -------------------------------------------------------------------------
-    with tab1:
-        st.subheader("Vendas Gerais por Mês, Trimestre e Ano")
-        vis_opcao = st.radio("Selecione a escala temporal:", ["Mês", "Trimestre", "Ano"], key="vis_g1", horizontal=True)
-        col_p = 'MES_ANO' if vis_opcao == "Mês" else ('TRIMESTRE' if vis_opcao == "Trimestre" else 'ANO')
+if uploaded_file is not None:
+    try:
+        df = pd.read_excel(uploaded_file)
         
-        df_vendas = df.groupby(col_p).size().reset_index(name='Total Vendas')
-        df_vendas = df_vendas[df_vendas[col_p] != 'N/A']
+        # Normalizar nomes de colunas
+        df.columns = [str(c).strip().upper() for c in df.columns]
         
-        media_vendas = df_vendas['Total Vendas'].mean() if not df_vendas.empty else 0
-        df_vendas['Desempenho'] = df_vendas['Total Vendas'].apply(lambda v: classificar_desempenho(v, media_vendas))
+        # Mapeamento de colunas esperadas
+        col_id = next((c for c in df.columns if 'ID' in c), None)
+        col_nome = next((c for c in df.columns if 'NOME' in c), None)
+        col_cpf = next((c for c in df.columns if 'CPF' in c), None)
+        col_proposta = next((c for c in df.columns if 'PROPOSTA' in c), None)
+        col_corretor = next((c for c in df.columns if 'CORRETOR' in c), None)
+        col_a_partir = next((c for c in df.columns if 'PARTIR' in c or 'DATA' in c), None)
         
-        color_map = {'Acima da Média': '#10B981', 'Na Média': '#2563EB', 'Abaixo da Média': '#EF4444'}
-        
-        fig = px.bar(
-            df_vendas, x=col_p, y='Total Vendas', color='Desempenho',
-            color_discrete_map=color_map, text='Total Vendas',
-            title=f"Volume Geral de Vendas por {vis_opcao} (Média do Período: {media_vendas:.1f})"
-        )
-        st.plotly_chart(fig, use_container_width=True)
-        st.dataframe(df_vendas, use_container_width=True)
-
-    # -------------------------------------------------------------------------
-    # GUIA 2: VENDAS POR CORRETORES
-    # -------------------------------------------------------------------------
-    with tab2:
-        st.subheader("Vendas por Corretores")
-        
-        c1, c2 = st.columns([1, 2])
-        with c1:
-            per_corretor = st.radio("Visão Temporal:", ["Mensal", "Trimestral", "Anual"], key="vis_corr", horizontal=True)
-        with c2:
-            lista_corretores = ["TODOS"] + sorted(df[col_corretor].dropna().unique().tolist())
-            corretor_sel = st.selectbox("Filtrar por Corretor Especifico:", options=lista_corretores)
-
-        col_c = 'MES_ANO' if per_corretor == "Mensal" else ('TRIMESTRE' if per_corretor == "Trimestral" else 'ANO')
-        
-        df_corr = df.copy()
-        if corretor_sel != "TODOS":
-            df_corr = df_corr[df_corr[col_corretor] == corretor_sel]
-            
-        df_grp = df_corr.groupby([col_c, col_corretor]).size().reset_index(name='Vendas')
-        df_grp = df_grp[df_grp[col_c] != 'N/A']
-        
-        df_grp['TEMP_DATE'] = pd.to_datetime(df_grp[col_c], format='%m/%Y', errors='coerce')
-        df_grp = df_grp.sort_values(by=['TEMP_DATE', 'Vendas'], ascending=[False, False]).drop(columns=['TEMP_DATE']).reset_index(drop=True)
-        
-        fig_corr = px.bar(
-            df_grp, x=col_c, y='Vendas', color=col_corretor, barmode='group',
-            text='Vendas', title=f"Vendas por Corretor ({per_corretor})"
-        )
-        st.plotly_chart(fig_corr, use_container_width=True)
-        
-        st.markdown("**Tabela Detalhada de Vendas por Corretor (Ordenado do Maior para o Menor por Período)**")
-        st.dataframe(df_grp, use_container_width=True)
-
-    # -------------------------------------------------------------------------
-    # GUIA 3: RANKING DE PRODUTORES (Com Seletor de Período)
-    # -------------------------------------------------------------------------
-    with tab3:
-        st.subheader("🏆 Ranking de Produtores (Coluna H)")
-        
-        vis_ranking = st.radio(
-            "Selecione a base temporal para o Ranking:",
-            ["Mensal", "Trimestral", "Semestral", "Anual"],
-            key="vis_ranking_sel",
-            horizontal=True
-        )
-        
-        if vis_ranking == "Mensal":
-            col_rank = 'MES_ANO'
-            titulo_rank = "Ranking de Vendas por Mês (Do Maior para o Menor)"
-        elif vis_ranking == "Trimestral":
-            col_rank = 'TRIMESTRE'
-            titulo_rank = "Ranking de Vendas por Trimestre (Do Maior para o Menor)"
-        elif vis_ranking == "Semestral":
-            col_rank = 'SEMESTRE'
-            titulo_rank = "Ranking de Vendas por Semestre (Do Maior para o Menor)"
+        # Processar Data
+        if col_a_partir:
+            df['DATA_REF'] = df[col_a_partir].apply(parse_data_partir)
+            df['ANO'] = df['DATA_REF'].apply(lambda d: str(d.year) if pd.notna(d) and d else 'N/A')
+            df['MES_ANO'] = df['DATA_REF'].apply(lambda d: d.strftime('%m/%Y') if pd.notna(d) and d else 'N/A')
+            df['TRIMESTRE'] = df['DATA_REF'].apply(lambda d: f"{d.year}-Q{(d.month-1)//3 + 1}" if pd.notna(d) and d else 'N/A')
         else:
-            col_rank = 'ANO'
-            titulo_rank = "Ranking de Vendas por Ano (Do Maior para o Menor)"
+            df['ANO'] = 'N/A'
+            df['MES_ANO'] = 'N/A'
+            df['TRIMESTRE'] = 'N/A'
             
-        st.markdown(f"#### {titulo_rank}")
+        # Converter colunas numéricas
+        cols_coberturas = [
+            'RISCO MORTE', 'PECULIO MORTE', 'RISCO INVALIDEZ', 'PECULIO INVALIDEZ',
+            'ADICIONAL MORTE', 'PECULIO ADICIONAL MORTE', 'ADICIONAL INVALIDEZ',
+            'PECULIO ADICIONAL INVALIDEZ', 'TOTAL'
+        ]
         
-        df_ranking_res = df.groupby([col_rank, col_corretor]).size().reset_index(name='Qtd Vendas')
-        df_ranking_res = df_ranking_res[df_ranking_res[col_rank] != 'N/A']
-        
-        df_ranking_res['TEMP_DATE'] = pd.to_datetime(df_ranking_res[col_rank], format='%m/%Y', errors='coerce')
-        df_ranking_res = df_ranking_res.sort_values(by=['TEMP_DATE', 'Qtd Vendas'], ascending=[False, False]).drop(columns=['TEMP_DATE']).reset_index(drop=True)
-        
-        st.dataframe(df_ranking_res, use_container_width=True)
-
-    # -------------------------------------------------------------------------
-    # GUIA 4: RELATÓRIO DOS RISCOS E PECÚLIOS CONTRATADOS
-    # -------------------------------------------------------------------------
-    with tab4:
-        st.subheader("Relatorio dos riscos e peculios contratados")
-        
-        lista_participantes = sorted(df[col_nome].dropna().unique().tolist())
-        
-        if lista_participantes:
-            participante_sel = st.selectbox(
-                "Busque ou selecione o participante:",
-                options=lista_participantes,
-                index=0
-            )
-            
-            df_part = df[df[col_nome] == participante_sel].iloc[0]
-            status_final = df_part['STATUS_DASHBOARD']
-            
-            if status_final == 'IMPLANTADA':
-                status_html = "<span style='background-color: #D1FAE5; color: #059669; padding: 4px 10px; border-radius: 6px; font-weight: bold;'>IMPLANTADA</span>"
+        for c in cols_coberturas:
+            if c in df.columns:
+                df[c] = pd.to_numeric(df[c].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False), errors='coerce').fillna(0)
             else:
-                status_html = "<span style='background-color: #FEE2E2; color: #DC2626; padding: 4px 10px; border-radius: 6px; font-weight: bold;'>A IMPLANTAR</span>"
+                df[c] = 0.0
+
+        # Abas da Aplicação
+        tab1, tab2, tab3 = st.tabs([
+            "📈 1. Vendas por Período",
+            "🏆 2. Ranking de Corretores",
+            "👤 3. Detalhamento por Participante"
+        ])
+        
+        # ----------------------------------------------------
+        # ABA 1: VENDAS POR MÊS, TRIMESTRE E ANO
+        # ----------------------------------------------------
+        with tab1:
+            st.subheader("Análise Temporal de Vendas")
             
-            st.markdown("---")
-            i1, i2, i3 = st.columns(3)
-            with i1:
-                st.markdown(f"**Proponente:** {df_part[col_nome]}")
-                st.markdown(f"**CPF:** `{mascarar_cpf(df_part[col_cpf])}`")
-            with i2:
-                st.markdown(f"**Proposta:** {df_part.get('PROPOSTA', 'N/A')}")
-                st.markdown(f"**Agente/Corretor:** {df_part[col_corretor]}")
-            with i3:
-                st.markdown(f"**Status:** {status_html}", unsafe_allow_html=True)
-                st.markdown(f"**Data da Proposta:** {df_part['MES_ANO']}")
-                
-            st.markdown("#### Detalhamento de Pecúlios e Riscos (Colunas J a V)")
+            col_kpi1, col_kpi2, col_kpi3 = st.columns(3)
+            total_vendas = len(df)
+            valor_total = df['TOTAL'].sum()
+            ticket_medio = df['TOTAL'].mean() if total_vendas > 0 else 0
             
-            detalhes_cob = []
-            for col_c in cols_coberturas:
-                val = df_part[col_c]
-                val_num = pd.to_numeric(val, errors='coerce')
+            col_kpi1.metric("Total de Propostas", f"{total_vendas:,}")
+            col_kpi2.metric("Volume Total (R$)", f"R$ {valor_total:,.2f}")
+            col_kpi3.metric("Ticket Médio (R$)", f"R$ {ticket_medio:,.2f}")
+            
+            st.divider()
+            
+            visao = st.radio("Selecione a visão temporal:", ["Mês", "Trimestre", "Ano"], horizontal=True)
+            col_agrupador = 'MES_ANO' if visao == "Mês" else ('TRIMESTRE' if visao == "Trimestre" else 'ANO')
+            
+            df_vendas = df.groupby(col_agrupador).agg(
+                Qtd_Vendas=(col_proposta if col_proposta else df.columns[0], 'count'),
+                Valor_Total=('TOTAL', 'sum')
+            ).reset_index()
+            
+            fig_vendas = px.bar(
+                df_vendas, 
+                x=col_agrupador, 
+                y='Qtd_Vendas',
+                text='Qtd_Vendas',
+                title=f'Quantidade de Vendas por {visao}',
+                labels={col_agrupador: visao, 'Qtd_Vendas': 'Nº de Vendas'},
+                color_discrete_sequence=['#2563EB']
+            )
+            fig_vendas.update_traces(textposition='outside')
+            st.plotly_chart(fig_vendas, use_container_width=True)
+            
+            fig_valor = px.line(
+                df_vendas, 
+                x=col_agrupador, 
+                y='Valor_Total',
+                markers=True,
+                title=f'Faturamento Total por {visao} (R$)',
+                labels={col_agrupador: visao, 'Valor_Total': 'Valor Total (R$)'},
+                color_discrete_sequence=['#10B981']
+            )
+            st.plotly_chart(fig_valor, use_container_width=True)
+            
+            st.dataframe(df_vendas, use_container_width=True)
+
+        # ----------------------------------------------------
+        # ABA 2: RANKING DE CORRETORES
+        # ----------------------------------------------------
+        with tab2:
+            st.subheader("Desempenho dos Corretores")
+            
+            c_f1, c_f2 = st.columns(2)
+            with c_f1:
+                tipo_periodo = st.selectbox("Filtrar por Granularidade:", ["Mensal", "Trimestral", "Anual"])
+            
+            col_p = 'MES_ANO' if tipo_periodo == "Mensal" else ('TRIMESTRE' if tipo_periodo == "Trimestral" else 'ANO')
+            
+            with c_f2:
+                opcoes_p = sorted(df[col_p].unique().tolist())
+                periodo_sel = st.selectbox("Selecione o Período:", opcoes_p)
                 
-                if pd.notna(val_num) and val_num != 0:
-                    val_fmt = f"R$ {val_num:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                    detalhes_cob.append({"Item / Cobertura": col_c, "Valor Registrado": val_fmt})
-                elif pd.notna(val) and str(val).strip() != "" and str(val).upper() != "NÃO":
-                    detalhes_cob.append({"Item / Cobertura": col_c, "Valor Registrado": str(val)})
+            df_corretor_filt = df[df[col_p] == periodo_sel]
+            
+            if col_corretor:
+                ranking = df_corretor_filt.groupby(col_corretor).agg(
+                    Qtd_Vendas=(col_proposta if col_proposta else df.columns[0], 'count'),
+                    Valor_Total=('TOTAL', 'sum')
+                ).reset_index().sort_values(by='Valor_Total', ascending=False)
+                
+                if not ranking.empty:
+                    campeao = ranking.iloc[0]
+                    st.success(f"🏆 **Corretor Campeão em {periodo_sel}:** {campeao[col_corretor]} com R$ {campeao['Valor_Total']:,.2f} em vendas ({campeao['Qtd_Vendas']} propostas).")
                     
-            if detalhes_cob:
-                st.table(pd.DataFrame(detalhes_cob))
-            else:
-                st.info("Nenhuma cobertura ativa para o participante selecionado.")
+                fig_rank = px.bar(
+                    ranking,
+                    x=col_corretor,
+                    y='Valor_Total',
+                    text='Valor_Total',
+                    color='Valor_Total',
+                    title=f'Ranking de Vendas por Corretor ({periodo_sel})',
+                    labels={'Valor_Total': 'Valor Total (R$)', col_corretor: 'Corretor'},
+                    color_continuous_scale='Blues'
+                )
+                fig_rank.update_traces(texttemplate='R$ %{text:,.2f}', textposition='outside')
+                st.plotly_chart(fig_rank, use_container_width=True)
                 
-            st.markdown("---")
-            excel_bytes = gerar_excel_formatado(df)
-            st.download_button(
-                label="📥 Exportar Relatório Completo Ajustado em Excel",
-                data=excel_bytes,
-                file_name="Relatorio_Riscos_Peculios_Completo.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-        else:
-            st.warning("Nenhum participante encontrado na base de dados.")
+                st.dataframe(ranking, use_container_width=True)
+
+        # ----------------------------------------------------
+        # ABA 3: CONSULTA DE PARTICIPANTE E COBERTURAS
+        # ----------------------------------------------------
+        with tab3:
+            st.subheader("Consulta de Coberturas Contratadas")
+            
+            busca = st.text_input("🔍 Digite o Nome ou CPF do Participante para buscar:")
+            
+            df_part = df.copy()
+            if busca and col_nome:
+                cond_nome = df_part[col_nome].astype(str).str.contains(busca, case=False, na=False)
+                cond_cpf = df_part[col_cpf].astype(str).str.contains(busca, case=False, na=False) if col_cpf else False
+                df_part = df_part[cond_nome | cond_cpf]
+                
+            if not df_part.empty and col_nome:
+                nome_sel = st.selectbox("Selecione o Participante:", df_part[col_nome].unique())
+                row = df_part[df_part[col_nome] == nome_sel].iloc[0]
+                
+                c_p1, c_p2, c_p3 = st.columns(3)
+                with c_p1:
+                    st.markdown(f"**Nome:** {row[col_nome] if col_nome else 'N/A'}")
+                    st.markdown(f"**CPF:** {row[col_cpf] if col_cpf else 'N/A'}")
+                with c_p2:
+                    st.markdown(f"**Proposta:** {row[col_proposta] if col_proposta else 'N/A'}")
+                    st.markdown(f"**Corretor:** {row[col_corretor] if col_corretor else 'N/A'}")
+                with c_p3:
+                    st.markdown(f"**Início:** {row[col_a_partir] if col_a_partir else 'N/A'}")
+                    st.markdown(f"**Valor Total:** R$ {row['TOTAL']:,.2f}")
+                    
+                st.write("### 🛡️ Coberturas (Colunas G a O)")
+                
+                coberturas_data = []
+                for cob in cols_coberturas[:-1]:
+                    val = row.get(cob, 0.0)
+                    coberturas_data.append({
+                        "Cobertura / Risco": cob,
+                        "Valor Contratado": f"R$ {val:,.2f}"
+                    })
+                    
+                df_cob_view = pd.DataFrame(coberturas_data)
+                st.table(df_cob_view)
+
+    except Exception as e:
+        st.error(f"Ocorreu um erro ao ler a planilha: {e}")
 else:
-    st.error("O arquivo 'RELACAO DE MALOTE RECEBIDO SEGURADORA.xlsx' não foi encontrado no repositório do GitHub. Certifique-se de enviá-lo para a mesma pasta do app.py.")
+    st.info("👈 Por favor, faça o upload da sua planilha Excel na barra lateral para começar.")
