@@ -180,26 +180,21 @@ if file is not None:
         st.dataframe(df_vendas, use_container_width=True)
 
     # -------------------------------------------------------------------------
-    # GUIA 2: VENDAS POR CORRETORES (ORDENADO DO MAIOR PARA O MENOR)
+    # GUIA 2: VENDAS POR CORRETORES
     # -------------------------------------------------------------------------
     with tab2:
         st.subheader("Vendas por Corretores")
         
-        per_corretor = st.radio("Escala Temporal:", ["Mensal", "Trimestral", "Anual"], key="vis_corr", horizontal=True)
-        col_c = 'MES_ANO' if per_corretor == "Mensal" else ('TRIMESTRE' if per_corretor == "Trimestral" else 'ANO')
-        
-        # Filtros específicos de período e corretor
-        c1, c2 = st.columns(2)
+        c1, c2 = st.columns([1, 2])
         with c1:
-            periodos_disponiveis = ["TODOS"] + sorted([p for p in df[col_c].dropna().unique() if p != 'N/A'])
-            periodo_sel = st.selectbox(f"Filtrar por {per_corretor[:-2]} Especifico:", options=periodos_disponiveis)
+            per_corretor = st.radio("Visão Temporal:", ["Mensal", "Trimestral", "Anual"], key="vis_corr", horizontal=True)
         with c2:
             lista_corretores = ["TODOS"] + sorted(df[col_corretor].dropna().unique().tolist())
             corretor_sel = st.selectbox("Filtrar por Corretor Especifico:", options=lista_corretores)
 
+        col_c = 'MES_ANO' if per_corretor == "Mensal" else ('TRIMESTRE' if per_corretor == "Trimestral" else 'ANO')
+        
         df_corr = df.copy()
-        if periodo_sel != "TODOS":
-            df_corr = df_corr[df_corr[col_c] == periodo_sel]
         if corretor_sel != "TODOS":
             df_corr = df_corr[df_corr[col_corretor] == corretor_sel]
             
@@ -209,18 +204,13 @@ if file is not None:
         # Ordenação do maior para o menor pelo volume de vendas
         df_grp = df_grp.sort_values(by=['Vendas', col_c], ascending=[False, True]).reset_index(drop=True)
         
-        # Destaque para o líder de vendas no topo
-        if not df_grp.empty:
-            lider = df_grp.iloc[0]
-            st.success(f"🥇 **Líder de Vendas no Período Selecionado:** {lider[col_corretor]} ({lider['Vendas']} vendas)")
-        
         fig_corr = px.bar(
             df_grp, x=col_c, y='Vendas', color=col_corretor, barmode='group',
-            text='Vendas', title=f"Vendas por Corretor ({per_corretor}) - Ordenado pelo Maior Volume"
+            text='Vendas', title=f"Vendas por Corretor ({per_corretor})"
         )
         st.plotly_chart(fig_corr, use_container_width=True)
         
-        st.markdown("**Tabela Detalhada de Vendas por Corretor (Do Maior para o Menor Volume)**")
+        st.markdown("**Tabela Detalhada de Vendas por Corretor (Ordenado por Maior Volume)**")
         st.dataframe(df_grp, use_container_width=True)
 
     # -------------------------------------------------------------------------
@@ -251,15 +241,7 @@ if file is not None:
     with tab4:
         st.subheader("Relatorio dos riscos e peculios contratados")
         
-        todos_status = sorted(df[col_status].unique().tolist())
-        status_sel = st.multiselect(
-            "Filtrar por Status da Proposta:",
-            options=todos_status,
-            default=todos_status
-        )
-        
-        df_filtrado = df[df[col_status].isin(status_sel)]
-        lista_participantes = sorted(df_filtrado[col_nome].dropna().unique().tolist())
+        lista_participantes = sorted(df[col_nome].dropna().unique().tolist())
         
         if lista_participantes:
             participante_sel = st.selectbox(
@@ -268,7 +250,7 @@ if file is not None:
                 index=0
             )
             
-            df_part = df_filtrado[df_filtrado[col_nome] == participante_sel].iloc[0]
+            df_part = df[df[col_nome] == participante_sel].iloc[0]
             
             st.markdown("---")
             i1, i2, i3 = st.columns(3)
@@ -309,6 +291,6 @@ if file is not None:
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
         else:
-            st.warning("Nenhum participante encontrado para o(s) status selecionado(s).")
+            st.warning("Nenhum participante encontrado na base de dados.")
 else:
     st.info("Aguardando upload da planilha na barra lateral.")
