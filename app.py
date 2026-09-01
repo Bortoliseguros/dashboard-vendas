@@ -38,8 +38,14 @@ uploaded_file = st.sidebar.file_uploader("Selecione a planilha Excel (.xlsx)", t
 def parse_data_partir(val):
     if pd.isna(val):
         return None
+    
+    # Se o Excel já leu diretamente como um objeto de data/Timestamp
+    if isinstance(val, (pd.Timestamp, datetime)):
+        return val
+
     val_str = str(val).strip().lower()
     
+    # Tratamento para textos do tipo 'set/26' ou 'set-2026'
     meses_pt = {
         'jan': 1, 'fev': 2, 'mar': 3, 'abr': 4, 'mai': 5, 'jun': 6,
         'jul': 7, 'ago': 8, 'set': 9, 'out': 10, 'nov': 11, 'dez': 12
@@ -53,11 +59,14 @@ def parse_data_partir(val):
             ano = int('20' + ano_str if len(ano_str) == 2 else ano_str)
             return datetime(ano, mes, 1)
             
+    # Tratamento para formato brasileiro DD/MM/AAAA (ex: 01/09/2026 -> 01 de Setembro)
     try:
-        dt = pd.to_datetime(val_str, dayfirst=True)
-        return dt.to_pydatetime()
+        dt = pd.to_datetime(val_str, dayfirst=True, errors='coerce')
+        if pd.notna(dt):
+            return dt.to_pydatetime()
     except:
-        return None
+        pass
+    return None
 
 if uploaded_file is not None:
     try:
@@ -85,7 +94,7 @@ if uploaded_file is not None:
             df['MES_ANO'] = 'N/A'
             df['TRIMESTRE'] = 'N/A'
             
-        # Converter colunas numéricas
+        # Converter colunas numéricas de coberturas
         cols_coberturas = [
             'RISCO MORTE', 'PECULIO MORTE', 'RISCO INVALIDEZ', 'PECULIO INVALIDEZ',
             'ADICIONAL MORTE', 'PECULIO ADICIONAL MORTE', 'ADICIONAL INVALIDEZ',
