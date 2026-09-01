@@ -11,7 +11,6 @@ from openpyxl.utils import get_column_letter
 
 st.set_page_config(page_title="Dashboard e Gestão de Riscos", layout="wide")
 
-
 # Mascaramento de CPF
 def mascarar_cpf(val):
     if pd.isna(val):
@@ -117,7 +116,9 @@ def gerar_excel_formatado(df_original):
     wb.save(output)
     return output.getvalue()
 
+# Título em Azul Claro estilizado
 st.markdown("<h1 style='color: #87CEEB;'>📊 Painel de riscos e pecúlios do Plano FLORIPAPREV</h1>", unsafe_allow_html=True)
+
 # CARREGAMENTO AUTOMÁTICO DO ARQUIVO EXATO NO GITHUB
 ARQUIVO_PADRAO = "RELACAO DE MALOTE RECEBIDO SEGURADORA.xlsx"
 
@@ -129,7 +130,6 @@ if os.path.exists(ARQUIVO_PADRAO):
     except Exception as e:
         st.sidebar.error(f"Erro ao ler o arquivo: {e}")
 else:
-    # Fallback caso o arquivo ainda não tenha sido enviado para o repositório
     st.sidebar.warning(f"Arquivo '{ARQUIVO_PADRAO}' não encontrado no GitHub. Envie abaixo:")
     file_up = st.sidebar.file_uploader("Enviar planilha (.xlsx)", type=["xlsx"])
     if file_up is not None:
@@ -157,19 +157,20 @@ if df is not None:
     df['TRIMESTRE'] = df['DATA_REF'].apply(lambda d: f"{d.year}-Q{(d.month-1)//3 + 1}" if pd.notna(d) else 'N/A')
     df['SEMESTRE'] = df['DATA_REF'].apply(lambda d: f"{d.year} - {1 if d.month <= 6 else 2}º Semestre" if pd.notna(d) else 'N/A')
     
-    # Estrutura das Guias
-    tab1, tab2, tab3, tab4 = st.tabs([
-        "📈 Vendas no Mês - Trimestre -  Ano",
+    # Estrutura das 5 Guias
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "📈 Vendas no Mês, Trimestre e Ano",
         "🤝 Vendas por Corretores (Mensal, Trimestral e Anual)",
-        "🏆 Ranking de Corretores",
-        "📋 Relatorio dos riscos e pecúlios contratados"
+        "🏆 Ranking de Produtores (Coluna H)",
+        "📋 Relatório dos riscos e pecúlios contratados",
+        "💰 Resumo de Contribuições"
     ])
     
     # -------------------------------------------------------------------------
     # GUIA 1: VENDAS GERAIS
     # -------------------------------------------------------------------------
     with tab1:
-        st.subheader("Vendas Gerais por Mês - Trimestre - Ano")
+        st.subheader("Vendas Gerais por Mês, Trimestre e Ano")
         vis_opcao = st.radio("Selecione a escala temporal:", ["Mês", "Trimestre", "Ano"], key="vis_g1", horizontal=True)
         col_p = 'MES_ANO' if vis_opcao == "Mês" else ('TRIMESTRE' if vis_opcao == "Trimestre" else 'ANO')
         
@@ -200,7 +201,7 @@ if df is not None:
             per_corretor = st.radio("Visão Temporal:", ["Mensal", "Trimestral", "Anual"], key="vis_corr", horizontal=True)
         with c2:
             lista_corretores = ["TODOS"] + sorted(df[col_corretor].dropna().unique().tolist())
-            corretor_sel = st.selectbox("Filtrar por Corretor Especifico:", options=lista_corretores)
+            corretor_sel = st.selectbox("Filtrar por Corretor Específico:", options=lista_corretores)
 
         col_c = 'MES_ANO' if per_corretor == "Mensal" else ('TRIMESTRE' if per_corretor == "Trimestral" else 'ANO')
         
@@ -224,10 +225,10 @@ if df is not None:
         st.dataframe(df_grp, use_container_width=True)
 
     # -------------------------------------------------------------------------
-    # GUIA 3: RANKING DE PRODUTORES (Com Seletor de Período)
+    # GUIA 3: RANKING DE PRODUTORES
     # -------------------------------------------------------------------------
     with tab3:
-        st.subheader("🏆 Ranking de Produtores")
+        st.subheader("🏆 Ranking de Produtores (Coluna H)")
         
         vis_ranking = st.radio(
             "Selecione a base temporal para o Ranking:",
@@ -263,7 +264,7 @@ if df is not None:
     # GUIA 4: RELATÓRIO DOS RISCOS E PECÚLIOS CONTRATADOS
     # -------------------------------------------------------------------------
     with tab4:
-        st.subheader("Relatorio dos riscos e peculios contratados")
+        st.subheader("Relatório dos riscos e pecúlios contratados")
         
         lista_participantes = sorted(df[col_nome].dropna().unique().tolist())
         
@@ -322,5 +323,79 @@ if df is not None:
             )
         else:
             st.warning("Nenhum participante encontrado na base de dados.")
+
+    # -------------------------------------------------------------------------
+    # GUIA 5: RESUMO E FILTRO DE CONTRIBUIÇÕES (NOVA ABA)
+    # -------------------------------------------------------------------------
+    with tab5:
+        st.subheader("💰 Somatório e Filtro por Tipo de Contribuição")
+        
+        # Mapeando as colunas específicas informadas (com base nos índices seguros J, L, N, P, R, T)
+        c_j = df.columns[9] if len(df.columns) > 9 else None   # 2554 - PECÚLIO POR MORTE PÚBLICO PARTICIPANTE
+        c_l = df.columns[11] if len(df.columns) > 11 else None # 2554 - PECÚLIO POR MORTE PÚBLICO PATROCINADORA
+        c_n = df.columns[13] if len(df.columns) > 13 else None # 2553 - PECÚLIO POR INVALIDEZ PÚBLICO PARTICIPANTE
+        c_p = df.columns[15] if len(df.columns) > 15 else None # 2553 - PECÚLIO POR INVALIDEZ PÚBLICO PATROCINADORA
+        c_r = df.columns[17] if len(df.columns) > 17 else None # 2029 - ADICIONAL PECÚLIO POR MORTE PÚBLICO
+        c_t = df.columns[19] if len(df.columns) > 19 else None # 2030 - ADICIONAL PECÚLIO POR INVALIDEZ PÚBLICO
+        
+        dict_contribs = {
+            "2554 - Pecúlio Morte (Participante)": c_j,
+            "2554 - Pecúlio Morte (Patrocinadora)": c_l,
+            "2553 - Pecúlio Invalidez (Participante)": c_n,
+            "2553 - Pecúlio Invalidez (Patrocinadora)": c_p,
+            "2029 - Adicional Pecúlio Morte": c_r,
+            "2030 - Adicional Pecúlio Invalidez": c_t
+        }
+        
+        # Limpar e converter valores para numérico
+        somas = {}
+        for nome_amigavel, col_nome_real in dict_contribs.items():
+            if col_nome_real and col_nome_real in df.columns:
+                df[col_nome_real] = pd.to_numeric(df[col_nome_real], errors='coerce').fillna(0)
+                somas[nome_amigavel] = df[col_nome_real].sum()
+            else:
+                somas[nome_amigavel] = 0.0
+
+        total_geral = sum(somas.values())
+
+        st.markdown("#### 📊 Quadro Geral de Somatórios por Contribuição")
+        
+        # Exibindo métricas em colunas (Quadros)
+        m1, m2, m3 = st.columns(3)
+        with m1:
+            st.metric("2554 - Morte (Participante)", f"R$ {somas['2554 - Pecúlio Morte (Participante)']:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+            st.metric("2553 - Invalidez (Participante)", f"R$ {somas['2553 - Pecúlio Invalidez (Participante)']:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        with m2:
+            st.metric("2554 - Morte (Patrocinadora)", f"R$ {somas['2554 - Pecúlio Morte (Patrocinadora)']:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+            st.metric("2553 - Invalidez (Patrocinadora)", f"R$ {somas['2553 - Pecúlio Invalidez (Patrocinadora)']:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        with m3:
+            st.metric("2029 - Adicional Morte", f"R$ {somas['2029 - Adicional Pecúlio Morte']:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+            st.metric("2030 - Adicional Invalidez", f"R$ {somas['2030 - Adicional Pecúlio Invalidez']:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+
+        st.markdown("---")
+        st.markdown(f"### 🏆 **TOTALIZADOR GERAL:** R$ {total_geral:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+        st.markdown("---")
+
+        # Seção de Filtro por Contribuição
+        st.subheader("🔍 Filtrar Participantes por Tipo de Contribuição")
+        tipo_filtro_sel = st.selectbox("Selecione o tipo de contribuição para filtrar:", options=list(dict_contribs.keys()))
+        
+        col_selecionada = dict_contribs[tipo_filtro_sel]
+        if col_selecionada and col_selecionada in df.columns:
+            # Filtrar apenas quem tem valor maior que 0 nessa coluna
+            df_filtrado_contrib = df[df[col_selecionada] > 0].copy()
+            
+            st.markdown(f"Exibindo **{len(df_filtrado_contrib)}** registros com valores em: `{tipo_filtro_sel}`")
+            
+            if not df_filtrado_contrib.empty:
+                # Criar visualização amigável contendo Nome, CPF, Corretor e o Valor da contribuição selecionada
+                cols_mostrar = [col_nome, col_cpf, col_corretor, col_selecionada]
+                df_exibicao = df_filtrado_contrib[cols_mostrar].copy()
+                df_exibicao[col_cpf] = df_exibicao[col_cpf].apply(mascarar_cpf)
+                df_exibicao[col_selecionada] = df_exibicao[col_selecionada].apply(lambda v: f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+                
+                st.dataframe(df_exibicao, use_container_width=True)
+            else:
+                st.info("Nenhum registro encontrado com valor maior que zero para esta contribuição.")
 else:
     st.error("O arquivo 'RELACAO DE MALOTE RECEBIDO SEGURADORA.xlsx' não foi encontrado no repositório do GitHub. Certifique-se de enviá-lo para a mesma pasta do app.py.")
