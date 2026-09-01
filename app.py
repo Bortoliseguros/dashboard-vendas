@@ -169,7 +169,7 @@ if df is not None:
     # GUIA 1: VENDAS GERAIS
     # -------------------------------------------------------------------------
     with tab1:
-        st.subheader("Vendas Gerais por Mês, Trimestre e Ano")
+        st.subheader("Vendas Gerais por Mês - Trimestre - Ano")
         vis_opcao = st.radio("Selecione a escala temporal:", ["Mês", "Trimestre", "Ano"], key="vis_g1", horizontal=True)
         col_p = 'MES_ANO' if vis_opcao == "Mês" else ('TRIMESTRE' if vis_opcao == "Trimestre" else 'ANO')
         
@@ -227,7 +227,7 @@ if df is not None:
     # GUIA 3: RANKING DE PRODUTORES (Com Seletor de Período)
     # -------------------------------------------------------------------------
     with tab3:
-        st.subheader("🏆 Ranking de Produtores (Coluna H)")
+        st.subheader("🏆 Ranking de Produtores")
         
         vis_ranking = st.radio(
             "Selecione a base temporal para o Ranking:",
