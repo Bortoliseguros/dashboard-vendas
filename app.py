@@ -7,7 +7,7 @@ from datetime import datetime
 
 # Configuração da Página
 st.set_page_config(
-    page_title="Dashboard Comercial & Coberturas",
+    page_title="Dashboard de contribuição de riscos e sua coberturas",
     page_icon="📊",
     layout="wide"
 )
@@ -29,7 +29,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<div class="main-header">📊 Dashboard Comercial e Relatório de Coberturas</div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header">📊 Dashboard de contribuição de riscos e sua coberturas</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-header">Faça o upload do seu arquivo Excel para processar os dados com conformidade de privacidade (LGPD).</div>', unsafe_allow_html=True)
 
 # Sidebar - Upload
@@ -123,7 +123,7 @@ if uploaded_file is not None:
         tab1, tab2, tab3 = st.tabs([
             "📈 1. Vendas por Período",
             "🏆 2. Ranking de Corretores",
-            "👤 3. Detalhamento por Participante"
+            "👤 3. Detalhamento dos riscos e peculios por Participante"
         ])
         
         # ----------------------------------------------------
