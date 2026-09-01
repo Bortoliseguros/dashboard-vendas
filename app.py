@@ -203,7 +203,9 @@ if file is not None:
         df_grp = df_corr.groupby([col_c, col_corretor]).size().reset_index(name='Vendas')
         df_grp = df_grp[df_grp[col_c] != 'N/A']
         
-        df_grp = df_grp.sort_values(by=['Vendas', col_c], ascending=[False, True]).reset_index(drop=True)
+        # ORDENAÇÃO CORRETA: Primeiro por período decrescente (mais recente primeiro) e depois por Vendas do maior para o menor
+        df_grp['TEMP_DATE'] = pd.to_datetime(df_grp[col_c], format='%m/%Y', errors='coerce')
+        df_grp = df_grp.sort_values(by=['TEMP_DATE', 'Vendas'], ascending=[False, False]).drop(columns=['TEMP_DATE']).reset_index(drop=True)
         
         fig_corr = px.bar(
             df_grp, x=col_c, y='Vendas', color=col_corretor, barmode='group',
@@ -211,7 +213,7 @@ if file is not None:
         )
         st.plotly_chart(fig_corr, use_container_width=True)
         
-        st.markdown("**Tabela Detalhada de Vendas por Corretor (Ordenado por Maior Volume)**")
+        st.markdown("**Tabela Detalhada de Vendas por Corretor (Ordenado do Maior para o Menor por Mês)**")
         st.dataframe(df_grp, use_container_width=True)
 
     # -------------------------------------------------------------------------
