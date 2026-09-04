@@ -170,7 +170,7 @@ if df is not None:
     # GUIA 1: VENDAS GERAIS
     # -------------------------------------------------------------------------
     with tab1:
-        st.subheader("Vendas Gerais por Mês, Trimestre e Ano")
+        st.subheader("Propostas Implantadas por Mês")
         vis_opcao = st.radio("Selecione a escala temporal:", ["Mês", "Trimestre", "Ano"], key="vis_g1", horizontal=True)
         col_p = 'MES_ANO' if vis_opcao == "Mês" else ('TRIMESTRE' if vis_opcao == "Trimestre" else 'ANO')
         
