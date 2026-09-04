@@ -161,7 +161,7 @@ if df is not None:
     tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "📈 Vendas no Mês, Trimestre e Ano",
         "🤝 Vendas por Corretores (Mensal, Trimestral e Anual)",
-        "🏆 Ranking de Produtores (Coluna H)",
+        "🏆 Ranking de Produtores",
         "📋 Relatório dos riscos e pecúlios contratados",
         "💰 Resumo de Contribuições"
     ])
@@ -228,7 +228,7 @@ if df is not None:
     # GUIA 3: RANKING DE PRODUTORES
     # -------------------------------------------------------------------------
     with tab3:
-        st.subheader("🏆 Ranking de Produtores (Coluna H)")
+        st.subheader("🏆 Ranking de Produtores")
         
         vis_ranking = st.radio(
             "Selecione a base temporal para o Ranking:",
