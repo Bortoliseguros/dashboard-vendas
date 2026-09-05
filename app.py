@@ -173,16 +173,16 @@ if df is not None:
         else:
             df_vendas = df_vendas.sort_values(by=col_p, ascending=True)
         
-        fig = px.bar(
-            df_vendas, 
-            x='Numero de riscos implantados', 
-            y=col_p, 
-            orientation='h',
-            color=col_p,
-            color_discrete_sequence=px.colors.qualitative.Vivid,
-            text='Numero de riscos implantados',
-            title=f"Volume de Riscos Implantados por {vis_opcao}"
-        )
+        fig1 = px.bar(
+    df_implantacoes,
+    x="sua_coluna_x",
+    y="sua_coluna_y",
+    color="sua_coluna_categoria",
+    color_discrete_map={
+        "Categoria Roxa": "yellow",  # Substitua pelo nome da categoria roxa
+        "Categoria Laranja": "lightblue",  # Substitua pelo nome da categoria laranja
+    },
+)
         fig.update_layout(showlegend=False)
         fig.update_xaxes(visible=False)
         st.plotly_chart(fig, use_container_width=True)
