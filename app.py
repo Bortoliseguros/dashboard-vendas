@@ -197,7 +197,7 @@ if df is not None:
     # GUIA 2: RANKING DE PRODUTORES
     # -------------------------------------------------------------------------
     with tab2:
-        st.subheader("🏆 Ranking de Produtores (Coluna H)")
+        st.subheader("🏆 Ranking de Produtores")
         
         vis_ranking = st.radio(
             "Selecione a base temporal para o Ranking:",
@@ -264,7 +264,7 @@ if df is not None:
                 st.markdown(f"**Status:** {status_html}", unsafe_allow_html=True)
                 st.markdown(f"**Data da Proposta:** {df_part['MES_ANO']}")
                 
-            st.markdown("#### Detalhamento de Pecúlios e Riscos (Colunas J a V)")
+            st.markdown("#### Detalhamento de Pecúlios e Riscos")
             
             detalhes_cob = []
             for col_c in cols_coberturas:
