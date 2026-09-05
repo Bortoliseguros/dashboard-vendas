@@ -157,7 +157,7 @@ if df is not None:
     ])
     
     # -------------------------------------------------------------------------
-    # GUIA 1: VENDAS GERAIS (Barras Horizontais Coloridas)
+    # GUIA 1: VENDAS GERAIS (Sem eixo X numérico)
     # -------------------------------------------------------------------------
     with tab1:
         st.subheader("Propostas e Riscos Implantados por Período")
@@ -174,7 +174,7 @@ if df is not None:
         else:
             df_vendas = df_vendas.sort_values(by=col_p, ascending=True)
         
-        # Gráfico de barras horizontais com cores variadas
+        # Gráfico de barras horizontais com cores variadas e sem a linha/números inferiores
         fig = px.bar(
             df_vendas, 
             x='Numero de riscos implantados', 
@@ -186,6 +186,7 @@ if df is not None:
             title=f"Volume de Riscos Implantados por {vis_opcao}"
         )
         fig.update_layout(showlegend=False)
+        fig.update_xaxes(visible=False) # Oculta a linha e os números da escala inferior
         st.plotly_chart(fig, use_container_width=True)
         
         # Tabela com as colunas solicitadas
