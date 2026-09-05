@@ -157,7 +157,7 @@ if df is not None:
     ])
     
     # -------------------------------------------------------------------------
-    # GUIA 1: VENDAS GERAIS (Sem eixo X numérico)
+    # GUIA 1: VENDAS GERAIS
     # -------------------------------------------------------------------------
     with tab1:
         st.subheader("Propostas e Riscos Implantados por Período")
@@ -167,14 +167,12 @@ if df is not None:
         df_vendas = df.groupby(col_p).size().reset_index(name='Numero de riscos implantados')
         df_vendas = df_vendas[df_vendas[col_p] != 'N/A']
         
-        # Ordenação cronológica correta
         if vis_opcao == "Mês":
             df_vendas['TEMP_DATE'] = pd.to_datetime(df_vendas[col_p], format='%m/%Y', errors='coerce')
             df_vendas = df_vendas.sort_values(by='TEMP_DATE', ascending=True).drop(columns=['TEMP_DATE'])
         else:
             df_vendas = df_vendas.sort_values(by=col_p, ascending=True)
         
-        # Gráfico de barras horizontais com cores variadas e sem a linha/números inferiores
         fig = px.bar(
             df_vendas, 
             x='Numero de riscos implantados', 
@@ -186,10 +184,9 @@ if df is not None:
             title=f"Volume de Riscos Implantados por {vis_opcao}"
         )
         fig.update_layout(showlegend=False)
-        fig.update_xaxes(visible=False) # Oculta a linha e os números da escala inferior
+        fig.update_xaxes(visible=False)
         st.plotly_chart(fig, use_container_width=True)
         
-        # Tabela com as colunas solicitadas
         df_tabela = df_vendas.rename(columns={col_p: 'Mês/Ano'})
         st.dataframe(df_tabela, use_container_width=True)
 
@@ -197,7 +194,7 @@ if df is not None:
     # GUIA 2: RANKING DE PRODUTORES
     # -------------------------------------------------------------------------
     with tab2:
-        st.subheader("🏆 Ranking de Produtores")
+        st.subheader("🏆 Ranking de Produtores (Coluna H)")
         
         vis_ranking = st.radio(
             "Selecione a base temporal para o Ranking:",
@@ -264,18 +261,21 @@ if df is not None:
                 st.markdown(f"**Status:** {status_html}", unsafe_allow_html=True)
                 st.markdown(f"**Data da Proposta:** {df_part['MES_ANO']}")
                 
-            st.markdown("#### Detalhamento de Pecúlios e Riscos")
+            st.markdown("#### Detalhamento de Pecúlios e Riscos (Colunas J a V)")
             
             detalhes_cob = []
             for col_c in cols_coberturas:
                 val = df_part[col_c]
                 val_num = pd.to_numeric(val, errors='coerce')
                 
+                # Remove numerações automáticas do pandas no final (ex: .1, .2)
+                nome_exibicao = re.sub(r'\.\d+$', '', str(col_c))
+                
                 if pd.notna(val_num) and val_num != 0:
                     val_fmt = f"R$ {val_num:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                    detalhes_cob.append({"Item / Cobertura": col_c, "Valor Registrado": val_fmt})
+                    detalhes_cob.append({"Item / Cobertura": nome_exibicao, "Valor Registrado": val_fmt})
                 elif pd.notna(val) and str(val).strip() != "" and str(val).upper() != "NÃO":
-                    detalhes_cob.append({"Item / Cobertura": col_c, "Valor Registrado": str(val)})
+                    detalhes_cob.append({"Item / Cobertura": nome_exibicao, "Valor Registrado": str(val)})
                     
             if detalhes_cob:
                 st.table(pd.DataFrame(detalhes_cob))
