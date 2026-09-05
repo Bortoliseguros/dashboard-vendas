@@ -20,15 +20,6 @@ def mascarar_cpf(val):
         return f"***.***.{digits[-5:-2]}-{digits[-2:]}"
     return "***.***.***-**"
 
-# Classificação de Desempenho
-def classificar_desempenho(val, media, tol=0.05):
-    if val > media * (1 + tol):
-        return 'Acima da Média'
-    elif val < media * (1 - tol):
-        return 'Abaixo da Média'
-    else:
-        return 'Na Média'
-
 # Regra oficial para a Coluna W (Status no 104)
 def obter_status_104(val):
     if pd.isna(val) or str(val).strip() == '' or str(val).strip().upper() == 'NAN':
@@ -157,78 +148,55 @@ if df is not None:
     df['TRIMESTRE'] = df['DATA_REF'].apply(lambda d: f"{d.year}-Q{(d.month-1)//3 + 1}" if pd.notna(d) else 'N/A')
     df['SEMESTRE'] = df['DATA_REF'].apply(lambda d: f"{d.year} - {1 if d.month <= 6 else 2}º Semestre" if pd.notna(d) else 'N/A')
     
-    # Estrutura das 5 Guias
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "📈 Quantidade de Propostas Implantadas",
-        "🤝 Vendas por Corretores (Mensal, Trimestral e Anual)",
-        "🏆 Ranking de Produtores",
+    # Estrutura das 4 Guias Atualizadas
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "📈 Vendas no Mês, Trimestre e Ano",
+        "🏆 Ranking de Produtores (Coluna H)",
         "📋 Relatório dos riscos e pecúlios contratados",
         "💰 Resumo de Contribuições"
     ])
     
     # -------------------------------------------------------------------------
-    # GUIA 1: VENDAS GERAIS
+    # GUIA 1: VENDAS GERAIS (Barras Horizontais Coloridas)
     # -------------------------------------------------------------------------
     with tab1:
-        st.subheader("Propostas Implantadas por Mês")
+        st.subheader("Propostas e Riscos Implantados por Período")
         vis_opcao = st.radio("Selecione a escala temporal:", ["Mês", "Trimestre", "Ano"], key="vis_g1", horizontal=True)
         col_p = 'MES_ANO' if vis_opcao == "Mês" else ('TRIMESTRE' if vis_opcao == "Trimestre" else 'ANO')
         
-        df_vendas = df.groupby(col_p).size().reset_index(name='Total Vendas')
+        df_vendas = df.groupby(col_p).size().reset_index(name='Numero de riscos implantados')
         df_vendas = df_vendas[df_vendas[col_p] != 'N/A']
         
-        media_vendas = df_vendas['Total Vendas'].mean() if not df_vendas.empty else 0
-        df_vendas['Desempenho'] = df_vendas['Total Vendas'].apply(lambda v: classificar_desempenho(v, media_vendas))
+        # Ordenação cronológica correta
+        if vis_opcao == "Mês":
+            df_vendas['TEMP_DATE'] = pd.to_datetime(df_vendas[col_p], format='%m/%Y', errors='coerce')
+            df_vendas = df_vendas.sort_values(by='TEMP_DATE', ascending=True).drop(columns=['TEMP_DATE'])
+        else:
+            df_vendas = df_vendas.sort_values(by=col_p, ascending=True)
         
-        color_map = {'Acima da Média': '#10B981', 'Na Média': '#2563EB', 'Abaixo da Média': '#EF4444'}
-        
+        # Gráfico de barras horizontais com cores variadas
         fig = px.bar(
-            df_vendas, x=col_p, y='Total Vendas', color='Desempenho',
-            color_discrete_map=color_map, text='Total Vendas',
-            title=f"Volume Geral de Vendas por {vis_opcao} (Média do Período: {media_vendas:.1f})"
+            df_vendas, 
+            x='Numero de riscos implantados', 
+            y=col_p, 
+            orientation='h',
+            color=col_p,
+            color_discrete_sequence=px.colors.qualitative.Vivid,
+            text='Numero de riscos implantados',
+            title=f"Volume de Riscos Implantados por {vis_opcao}"
         )
+        fig.update_layout(showlegend=False)
         st.plotly_chart(fig, use_container_width=True)
-        st.dataframe(df_vendas, use_container_width=True)
+        
+        # Tabela com as colunas solicitadas
+        df_tabela = df_vendas.rename(columns={col_p: 'Mês/Ano'})
+        st.dataframe(df_tabela, use_container_width=True)
 
     # -------------------------------------------------------------------------
-    # GUIA 2: VENDAS POR CORRETORES
+    # GUIA 2: RANKING DE PRODUTORES
     # -------------------------------------------------------------------------
     with tab2:
-        st.subheader("Vendas por Corretores")
-        
-        c1, c2 = st.columns([1, 2])
-        with c1:
-            per_corretor = st.radio("Visão Temporal:", ["Mensal", "Trimestral", "Anual"], key="vis_corr", horizontal=True)
-        with c2:
-            lista_corretores = ["TODOS"] + sorted(df[col_corretor].dropna().unique().tolist())
-            corretor_sel = st.selectbox("Filtrar por Corretor Específico:", options=lista_corretores)
-
-        col_c = 'MES_ANO' if per_corretor == "Mensal" else ('TRIMESTRE' if per_corretor == "Trimestral" else 'ANO')
-        
-        df_corr = df.copy()
-        if corretor_sel != "TODOS":
-            df_corr = df_corr[df_corr[col_corretor] == corretor_sel]
-            
-        df_grp = df_corr.groupby([col_c, col_corretor]).size().reset_index(name='Vendas')
-        df_grp = df_grp[df_grp[col_c] != 'N/A']
-        
-        df_grp['TEMP_DATE'] = pd.to_datetime(df_grp[col_c], format='%m/%Y', errors='coerce')
-        df_grp = df_grp.sort_values(by=['TEMP_DATE', 'Vendas'], ascending=[False, False]).drop(columns=['TEMP_DATE']).reset_index(drop=True)
-        
-        fig_corr = px.bar(
-            df_grp, x=col_c, y='Vendas', color=col_corretor, barmode='group',
-            text='Vendas', title=f"Vendas por Corretor ({per_corretor})"
-        )
-        st.plotly_chart(fig_corr, use_container_width=True)
-        
-        st.markdown("**Tabela Detalhada de Vendas por Corretor (Ordenado do Maior para o Menor por Período)**")
-        st.dataframe(df_grp, use_container_width=True)
-
-    # -------------------------------------------------------------------------
-    # GUIA 3: RANKING DE PRODUTORES
-    # -------------------------------------------------------------------------
-    with tab3:
-        st.subheader("🏆 Ranking de Produtores")
+        st.subheader("🏆 Ranking de Produtores (Coluna H)")
         
         vis_ranking = st.radio(
             "Selecione a base temporal para o Ranking:",
@@ -261,9 +229,9 @@ if df is not None:
         st.dataframe(df_ranking_res, use_container_width=True)
 
     # -------------------------------------------------------------------------
-    # GUIA 4: RELATÓRIO DOS RISCOS E PECÚLIOS CONTRATADOS
+    # GUIA 3: RELATÓRIO DOS RISCOS E PECÚLIOS CONTRATADOS
     # -------------------------------------------------------------------------
-    with tab4:
+    with tab3:
         st.subheader("Relatório dos riscos e pecúlios contratados")
         
         lista_participantes = sorted(df[col_nome].dropna().unique().tolist())
@@ -325,12 +293,11 @@ if df is not None:
             st.warning("Nenhum participante encontrado na base de dados.")
 
     # -------------------------------------------------------------------------
-    # GUIA 5: RESUMO E FILTRO DE CONTRIBUIÇÕES (NOVA ABA)
+    # GUIA 4: RESUMO E FILTRO DE CONTRIBUICOES
     # -------------------------------------------------------------------------
-    with tab5:
+    with tab4:
         st.subheader("💰 Somatório e Filtro por Tipo de Contribuição")
         
-        # Mapeando as colunas específicas informadas (com base nos índices seguros J, L, N, P, R, T)
         c_j = df.columns[9] if len(df.columns) > 9 else None   # 2554 - PECÚLIO POR MORTE PÚBLICO PARTICIPANTE
         c_l = df.columns[11] if len(df.columns) > 11 else None # 2554 - PECÚLIO POR MORTE PÚBLICO PATROCINADORA
         c_n = df.columns[13] if len(df.columns) > 13 else None # 2553 - PECÚLIO POR INVALIDEZ PÚBLICO PARTICIPANTE
@@ -347,7 +314,6 @@ if df is not None:
             "2030 - Adicional Pecúlio Invalidez": c_t
         }
         
-        # Limpar e converter valores para numérico
         somas = {}
         for nome_amigavel, col_nome_real in dict_contribs.items():
             if col_nome_real and col_nome_real in df.columns:
@@ -360,7 +326,6 @@ if df is not None:
 
         st.markdown("#### 📊 Quadro Geral de Somatórios por Contribuição")
         
-        # Exibindo métricas em colunas (Quadros)
         m1, m2, m3 = st.columns(3)
         with m1:
             st.metric("2554 - Morte (Participante)", f"R$ {somas['2554 - Pecúlio Morte (Participante)']:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
@@ -376,19 +341,16 @@ if df is not None:
         st.markdown(f"### 🏆 **TOTALIZADOR GERAL:** R$ {total_geral:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
         st.markdown("---")
 
-        # Seção de Filtro por Contribuição
         st.subheader("🔍 Filtrar Participantes por Tipo de Contribuição")
         tipo_filtro_sel = st.selectbox("Selecione o tipo de contribuição para filtrar:", options=list(dict_contribs.keys()))
         
         col_selecionada = dict_contribs[tipo_filtro_sel]
         if col_selecionada and col_selecionada in df.columns:
-            # Filtrar apenas quem tem valor maior que 0 nessa coluna
             df_filtrado_contrib = df[df[col_selecionada] > 0].copy()
             
             st.markdown(f"Exibindo **{len(df_filtrado_contrib)}** registros com valores em: `{tipo_filtro_sel}`")
             
             if not df_filtrado_contrib.empty:
-                # Criar visualização amigável contendo Nome, CPF, Corretor e o Valor da contribuição selecionada
                 cols_mostrar = [col_nome, col_cpf, col_corretor, col_selecionada]
                 df_exibicao = df_filtrado_contrib[cols_mostrar].copy()
                 df_exibicao[col_cpf] = df_exibicao[col_cpf].apply(mascarar_cpf)
