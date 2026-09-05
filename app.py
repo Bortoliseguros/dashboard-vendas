@@ -150,8 +150,8 @@ if df is not None:
     
     # Estrutura das 4 Guias Atualizadas
     tab1, tab2, tab3, tab4 = st.tabs([
-        "📈 Vendas no Mês, Trimestre e Ano",
-        "🏆 Ranking de Produtores (Coluna H)",
+        "📈 Implantações",
+        "🏆 Ranking de Produtores",
         "📋 Relatório dos riscos e pecúlios contratados",
         "💰 Resumo de Contribuições"
     ])
