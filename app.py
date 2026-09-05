@@ -182,7 +182,7 @@ if df is not None:
         "Categoria Roxa": "yellow",  # Substitua pelo nome da categoria roxa
         "Categoria Laranja": "lightblue",  # Substitua pelo nome da categoria laranja
     },
-)
+
         fig.update_layout(showlegend=False)
         fig.update_xaxes(visible=False)
         st.plotly_chart(fig, use_container_width=True)
