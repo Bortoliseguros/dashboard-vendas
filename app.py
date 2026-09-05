@@ -150,14 +150,14 @@ if df is not None:
     
     # Estrutura das 4 Guias Atualizadas
     tab1, tab2, tab3, tab4 = st.tabs([
-        "📈 Implantações",
-        "🏆 Ranking de Produtores",
+        "📈 Vendas no Mês, Trimestre e Ano",
+        "🏆 Ranking de Produtores (Coluna H)",
         "📋 Relatório dos riscos e pecúlios contratados",
         "💰 Resumo de Contribuições"
     ])
     
     # -------------------------------------------------------------------------
-    # GUIA 1: VENDAS GERAIS
+    # GUIA 1: VENDAS GERAIS (Com cores personalizadas, sem eixo X e barras horizontais)
     # -------------------------------------------------------------------------
     with tab1:
         st.subheader("Propostas e Riscos Implantados por Período")
@@ -173,16 +173,22 @@ if df is not None:
         else:
             df_vendas = df_vendas.sort_values(by=col_p, ascending=True)
         
-        fig1 = px.bar(
-    df_implantacoes,
-    x="sua_coluna_x",
-    y="sua_coluna_y",
-    color="sua_coluna_categoria",
-    color_discrete_map={
-        "Categoria Roxa": "yellow",  # Substitua pelo nome da categoria roxa
-        "Categoria Laranja": "lightblue",  # Substitua pelo nome da categoria laranja
-    },
-
+        # Paleta personalizada: amarelo e azul claro substituindo roxo/laranja
+        cores_personalizadas = [
+            '#1f77b4', '#2ca02c', 'yellow', '#87CEEB', '#e377c2', 
+            '#7f7f7f', '#bcbd22', '#17becf', '#aec7e8', '#ffbb78'
+        ]
+        
+        fig = px.bar(
+            df_vendas, 
+            x='Numero de riscos implantados', 
+            y=col_p, 
+            orientation='h',
+            color=col_p,
+            color_discrete_sequence=cores_personalizadas,
+            text='Numero de riscos implantados',
+            title=f"Volume de Riscos Implantados por {vis_opcao}"
+        )
         fig.update_layout(showlegend=False)
         fig.update_xaxes(visible=False)
         st.plotly_chart(fig, use_container_width=True)
